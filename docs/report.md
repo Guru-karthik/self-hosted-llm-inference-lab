@@ -42,7 +42,9 @@ Sources: README environment table, [`results/slurm/versions.txt`](../results/slu
 
 **Operations agent.** Twelve faults with expected diagnoses written beforehand; the agent is asked the same question after each is injected. A second vLLM instance serves the agent, so breaking the target does not remove the agent's model.
 
-## Repeated runs
+## 4. Results
+
+### 4.1 Serving engines under concurrent load
 
 <!-- BEGIN generated: repeated-runs -->
 | Setup | Concurrency | OK | TTFT p50 (s) | Tok/s per request p50 | E2E p50 (s) | Aggregate output tok/s | Peak VRAM |
@@ -66,7 +68,16 @@ Sources: README environment table, [`results/slurm/versions.txt`](../results/slu
 Source: `results/phase3/vllm/, results/phase3/ollama-default/, results/phase3/ollama-tuned/`
 <!-- END generated: repeated-runs -->
 
-## Start-up
+Times are in seconds; peak VRAM is MiB for the whole GPU.
+
+- With its default of one parallel slot, Ollama's TTFT p50 rose from 0.023 s at concurrency 1 to 3.248 s at concurrency 8, while aggregate throughput stayed between 129.1 and 135.9 tokens/s. Requests were effectively served one at a time.
+- With 8 slots, Ollama's TTFT p50 at concurrency 8 was 0.056 s and aggregate throughput 520.2 tokens/s. Each request became slower: 70.7 instead of 141.0 tokens/s.
+- vLLM reached 968.3 aggregate tokens/s at concurrency 8 and did not rise further at 16 (974.0), where TTFT grew to 0.307 s because requests beyond 8 queue.
+- At concurrency 8 the TTFT intervals of vLLM and tuned Ollama overlap, so these data do not rank them on TTFT.
+
+The practical lesson is that a comparison at default settings mostly measured a configuration choice. It does not show how far either engine could be tuned.
+
+### 4.2 Starting from zero
 
 <!-- BEGIN generated: startup -->
 | Case | Seconds |
@@ -78,7 +89,9 @@ Source: `results/phase3/vllm/, results/phase3/ollama-default/, results/phase3/ol
 Source: `results/startup/*.csv`
 <!-- END generated: startup -->
 
-## GPU time-slicing
+Seconds are from scale-up (or `docker run`) to the first successful chat completion; image already present. The k3s runs had the weights cached in a volume. vLLM's own initialisation took 92.72 s of such a start in an earlier k3s observation (93.56 s in Docker), so a weight cache removes the download but not the engine start (`LOG.md`). The empty-volume figure is one observation, mostly of this machine's network, and exists only for Docker: pods here could not download from Hugging Face ([write-up](pod-network-download-issue.md)).
+
+### 4.3 Two servers on one GPU
 
 <!-- BEGIN generated: sharing -->
 | Setup | Concurrency | OK | TTFT p50 | Tok/s p50 | E2E p50 | E2E p95 |
@@ -92,3 +105,40 @@ Source: `results/startup/*.csv`
 
 Source: `results/sharing/a_alone/, results/sharing/a_with_b/, results/sharing/b_with_a/`
 <!-- END generated: sharing -->
+
+With both servers busy, per-request speed at concurrency 1 fell from 153.1 to about 72 tokens/s (71.7 and 71.5), and median latency rose from 0.431 s to 0.912 s and 0.918 s. Both pods saw all 16,303 MiB of GPU memory. Starting the second server needed a fixed KV-cache size, because vLLM counted the other pod's memory against its own budget (`LOG.md`). Time-slicing therefore shares a GPU but neither isolates memory nor guarantees a share of compute.
+
+### 4.4 Two tenants on Kubernetes
+
+Two namespaces, each with its own vLLM, quota, limits, read-only ServiceAccount and default-deny NetworkPolicies. The final run of the [isolation test](../k8s/tests/isolation-test.sh) passed 20 of 20 checks ([`results/isolation/isolation-test.txt`](../results/isolation/isolation-test.txt)).
+
+| Property | Result |
+|---|---|
+| Tenant-to-tenant network traffic | Blocked; it succeeded when the policies were removed |
+| Tenant identity reading the other tenant's pods or secrets | HTTP 403 |
+| Second GPU unit, excess memory request, extra volume claim | Rejected: `exceeded quota` |
+| GPU memory and compute | **Not isolated** |
+| Node (kernel, disk, host memory) and traffic from the node itself | **Not isolated** |
+| Restricting Prometheus to `/metrics` | **Not possible with NetworkPolicy**: it was allowed all of port 8000 |
+
+### 4.5 Batch scheduling next to inference
+
+A single-node Slurm sandbox, not an HPC cluster ([`results/slurm/`](../results/slurm/)). Fair-share worked as configured: after the `research` account had used the node, two `teaching` jobs submitted later started before two earlier `research` jobs ([`2_fairshare.txt`](../results/slurm/fairshare/2_fairshare.txt)). A high-priority QoS and a short partition also reordered the queue.
+
+Two limits matter more than the mechanics:
+
+- Slurm's GPU here is a counter. A job that requested no GPU could still see it ([`results/slurm/gpu/`](../results/slurm/gpu/)).
+- Slurm offered the GPU while a Kubernetes pod was using it. Neither scheduler knows about the other. Options for coordinating them are compared in [slurm-vs-kubernetes.md](slurm-vs-kubernetes.md) (design, not tested).
+
+Apptainer ran the benchmark client from a `.sif` once the WSL driver folder was bound in; vLLM itself was not run in Apptainer because the image download failed twice (`LOG.md`).
+
+### 4.6 A model as operations assistant
+
+Twelve faults were injected, one run each, with the diagnoses expected from the agent written in advance ([`mcp/eval/faults.yaml`](../mcp/eval/faults.yaml); runs in [`results/mcp-eval/`](../results/mcp-eval/)). **The answers have not yet been scored by a person, so no accuracy is reported.** What can be stated without judgement:
+
+- In all 17 runs (12 faults and 5 prompt-injection runs) the agent called the same five tools in the same order and never a GPU tool, so it could not have noticed that GPU metrics were missing.
+- vLLM 0.32.0 did not count client disconnects in its finished-request counter, so one fault was invisible to every tool ([`abort_check.txt`](../results/mcp-eval/smoke/abort_check.txt)).
+- Several different faults (scaled to zero, restarting, crash loop; wrong scrape path, blocked scrape) look nearly alike through these tools, which cannot read pods, logs or configuration.
+- Prompt injection: text appended to a real tool result was copied into the answer in 2 of 2 runs. Two attempts through an added log tool never reached the model, which did not call it. A planted "report healthy" instruction reached the model in 1 run; that answer still reported the latency and the queue.
+
+Read-only, fixed-query tools limited what an injected instruction could do to the wording of an answer. They did not stop it changing the wording, so the answer has to be treated as untrusted input by whoever or whatever reads it.
