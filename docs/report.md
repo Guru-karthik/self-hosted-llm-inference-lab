@@ -2,7 +2,45 @@
      from results/ by scripts/render-results.py and checked in CI; do not edit them by hand. -->
 # Serving a 7B model on one GPU: measurements, isolation and operations
 
-*Technical report. Draft.*
+*Technical report on a single-machine lab, 2026-10-29 and 2026-11-25. Every number comes from a file in [`results/`](../results/) or from [`LOG.md`](../LOG.md).*
+
+## 1. Question
+
+A university IT centre that offers model inference to several groups has to answer practical questions before it buys or shares hardware. This lab asks small versions of four of them on one consumer GPU:
+
+1. How do two common serving engines behave when several requests arrive at once, and how much of the difference is configuration?
+2. What does it cost to start a model server from zero, and what happens when two servers share one GPU?
+3. Which parts of a two-tenant setup on Kubernetes can be shown to be isolated, and which cannot?
+4. Can a small local model, given read-only monitoring tools, help an operator diagnose faults?
+
+The answers are limited to one machine. Nothing here is a capacity plan, a security assessment or a reliability study.
+
+## 2. Setup
+
+| Item | Value |
+|---|---|
+| GPU | NVIDIA GeForce RTX 5070 Ti, 16,303 MiB |
+| CPU and memory | AMD Ryzen 7 9700X (16 logical CPUs); 15 GiB visible inside WSL2 |
+| Operating system | Ubuntu 24.04.4 LTS on WSL2, kernel 6.18.33.2-microsoft-standard-WSL2 |
+| Engines | vLLM 0.32.0 with `Qwen/Qwen2.5-7B-Instruct-AWQ`; Ollama 0.40.13 with `qwen2.5:7b-instruct-q4_K_M` (GGUF); images pinned by digest |
+| Kubernetes | k3s v1.36.5+k3s1, single node; NVIDIA device plugin 0.20.1 |
+| Monitoring | kube-prometheus-stack 92.15.0, dcgm-exporter 4.8.4 |
+| Batch scheduling | Slurm 23.11.4 sandbox on the same machine; Apptainer 1.5.5 |
+| Operations agent | MCP Python SDK 2.3.0; 8 read-only tools with fixed Prometheus queries |
+
+Sources: README environment table, [`results/slurm/versions.txt`](../results/slurm/versions.txt).
+
+## 3. Method
+
+**Load.** [`benchmark/bench.py`](../benchmark/bench.py) sends streaming chat requests from a fixed set of 8 prompts, 2 repeats each (16 requests per batch), `max_tokens=64`, `temperature=0`, after one warm-up request. It records time to first token (TTFT), completion tokens per second after the first token (per request), end-to-end latency, failures and peak GPU memory.
+
+**Repetition.** The 2026-11-25 sweeps run each concurrency level (1, 2, 4, 8, 16) five times back to back. For each run it takes the median TTFT, tokens per second and latency, plus aggregate throughput (all output tokens divided by the wall time of the batch). Tables give the mean over the five runs and the half-width of the 95% confidence interval (Student t, 4 degrees of freedom). The earlier results are single runs.
+
+**Engines.** One engine used the GPU at a time. vLLM ran with `--max-model-len 4096 --gpu-memory-utilization 0.80 --max-num-seqs 8`. Ollama ran with defaults (it reported `OLLAMA_NUM_PARALLEL:1`) and, separately, with `OLLAMA_NUM_PARALLEL=8` and `OLLAMA_CONTEXT_LENGTH=4096`.
+
+**Isolation checks.** An automated script first removes the NetworkPolicies to show that traffic then flows, applies them, and checks that each blocked path has a control that still works.
+
+**Operations agent.** Twelve faults with expected diagnoses written beforehand; the agent is asked the same question after each is injected. A second vLLM instance serves the agent, so breaking the target does not remove the agent's model.
 
 ## Repeated runs
 
