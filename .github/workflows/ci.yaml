@@ -24,6 +24,9 @@ jobs:
       - name: yamllint
         run: yamllint .
 
+      - name: README tables match results/
+        run: python scripts/render-results.py --check
+
       - name: pytest
         run: |
           python -m pytest -q benchmark/tests

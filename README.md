@@ -93,6 +93,7 @@ Only one engine used the GPU at a time, except in the deliberate time-slicing ex
 
 All values are from [`results/`](results/). Times in seconds; "Tok/s" is the per-request p50; VRAM is MiB for the whole GPU.
 
+<!-- BEGIN generated: single-runs -->
 | Setup | Concurrency | OK | TTFT p50 | TTFT p95 | Tok/s p50 | E2E p50 | E2E p95 | Peak VRAM |
 |---|---|---|---|---|---|---|---|---|
 | Ollama 0.40.13, GGUF Q4_K_M (Docker) | 1 | 16/16 | 0.021 | 0.024 | 145.5 | 0.461 | 0.469 | 6234 |
@@ -107,6 +108,7 @@ All values are from [`results/`](results/). Times in seconds; "Tok/s" is the per
 | vLLM 0.32.0, AWQ 4-bit (k3s, via port-forward) | 2 | 16/16 | 0.027 | 0.029 | 151.6 | 0.444 | 0.539 | 13582 |
 | vLLM 0.32.0, AWQ 4-bit (k3s, via port-forward) | 4 | 16/16 | 0.034 | 0.037 | 151.6 | 0.454 | 0.462 | 13582 |
 | vLLM 0.32.0, AWQ 4-bit (k3s, via port-forward) | 8 | 16/16 | 0.049 | 0.052 | 150.6 | 0.473 | 0.478 | 13584 |
+<!-- END generated: single-runs -->
 
 Other measured facts:
 
@@ -127,6 +129,28 @@ What the data show on this machine and workload (short prompts, 64 output tokens
 - Different runtimes with different defaults (batching, KV-cache sizing, context length: vLLM was capped at 4,096 tokens).
 - Short, fixed prompts and 64 output tokens only; no long-context or sustained-load test; one run per configuration, so no confidence intervals.
 
+### Repeated runs, and Ollama with parallelism tuned
+
+<!-- BEGIN generated: repeated-runs -->
+| Setup | Concurrency | OK | TTFT p50 (s) | Tok/s per request p50 | E2E p50 (s) | Aggregate output tok/s | Peak VRAM |
+|---|---|---|---|---|---|---|---|
+| vLLM 0.32.0, AWQ | 1 | 80/80 | 0.026 ± 0.002 | 140.8 ± 0.3 | 0.480 ± 0.002 | 132.7 ± 0.7 | 14358 |
+| vLLM 0.32.0, AWQ | 2 | 80/80 | 0.030 ± 0.005 | 142.1 ± 0.8 | 0.481 ± 0.005 | 263.4 ± 2.1 | 14346 |
+| vLLM 0.32.0, AWQ | 4 | 80/80 | 0.049 ± 0.006 | 141.2 ± 1.5 | 0.501 ± 0.004 | 504.2 ± 4.1 | 14346 |
+| vLLM 0.32.0, AWQ | 8 | 80/80 | 0.066 ± 0.004 | 141.1 ± 0.7 | 0.521 ± 0.011 | 968.3 ± 16.8 | 14348 |
+| vLLM 0.32.0, AWQ | 16 | 80/80 | 0.307 ± 0.010 | 139.3 ± 2.7 | 0.789 ± 0.033 | 974.0 ± 33.7 | 14348 |
+| Ollama 0.40.13, defaults (1 slot) | 1 | 80/80 | 0.023 ± 0.005 | 137.3 ± 5.0 | 0.488 ± 0.021 | 129.1 ± 8.8 | 6100 |
+| Ollama 0.40.13, defaults (1 slot) | 2 | 80/80 | 0.494 ± 0.011 | 138.3 ± 2.4 | 0.954 ± 0.017 | 131.3 ± 5.0 | 6102 |
+| Ollama 0.40.13, defaults (1 slot) | 4 | 80/80 | 1.403 ± 0.023 | 140.2 ± 1.0 | 1.852 ± 0.022 | 134.3 ± 2.3 | 6101 |
+| Ollama 0.40.13, defaults (1 slot) | 8 | 80/80 | 3.248 ± 0.013 | 141.0 ± 0.3 | 3.696 ± 0.025 | 135.9 ± 0.4 | 6102 |
+| Ollama 0.40.13, defaults (1 slot) | 16 | 80/80 | 3.523 ± 0.197 | 140.7 ± 3.3 | 3.959 ± 0.209 | 134.9 ± 5.0 | 6114 |
+| Ollama 0.40.13, tuned (8 slots) | 1 | 80/80 | 0.033 ± 0.006 | 113.0 ± 9.4 | 0.599 ± 0.051 | 104.1 ± 4.7 | 7812 |
+| Ollama 0.40.13, tuned (8 slots) | 2 | 80/80 | 0.047 ± 0.009 | 104.0 ± 5.0 | 0.661 ± 0.032 | 172.3 ± 64.4 | 7819 |
+| Ollama 0.40.13, tuned (8 slots) | 4 | 80/80 | 0.064 ± 0.010 | 89.5 ± 8.5 | 0.786 ± 0.070 | 325.9 ± 22.8 | 7812 |
+| Ollama 0.40.13, tuned (8 slots) | 8 | 80/80 | 0.056 ± 0.012 | 70.7 ± 7.6 | 0.940 ± 0.092 | 520.2 ± 52.7 | 7813 |
+| Ollama 0.40.13, tuned (8 slots) | 16 | 80/80 | 0.398 ± 0.058 | 76.7 ± 5.6 | 1.240 ± 0.066 | 564.4 ± 54.2 | 7813 |
+<!-- END generated: repeated-runs -->
+
 ### Docker vs Kubernetes
 
 vLLM in k3s gave similar numbers to Docker (TTFT p50 0.020 to 0.049 s vs 0.016 to 0.035 s; tokens/s p50 149 to 152 vs 146 to 150). The cluster run goes through `kubectl port-forward` and was run once, so I make no claim about which is faster.
@@ -135,11 +159,13 @@ vLLM in k3s gave similar numbers to Docker (TTFT p50 0.020 to 0.049 s vs 0.016 t
 
 Measured with [`scripts/measure-k8s-startup.sh`](scripts/measure-k8s-startup.sh) and [`scripts/measure-docker-startup.sh`](scripts/measure-docker-startup.sh); raw data in [`results/startup/`](results/startup/). "Seconds" is wall-clock time from the scale-up (or `docker run`) until the first successful chat completion.
 
+<!-- BEGIN generated: startup -->
 | Case | Seconds |
 |---|---|
 | k3s, scale 0 to 1, weights already in PVC (3 runs) | 144.8, 134.6, 143.8 |
 | Docker, weights already in volume (1 run) | 138.1 |
 | Docker, empty volume: weights downloaded from Hugging Face (1 run) | 7302.2 |
+<!-- END generated: startup -->
 
 The empty-cache figure is almost entirely download time (5.2 GB), so it mostly measures this machine's network at that moment, not vLLM. It varied a lot: an earlier, aborted attempt (script bug, not reported as a result) had its weights loaded roughly 40 minutes after starting, judging from log timestamps. Treat the cold number as one observation, not a typical value. Both Docker figures exclude the image pull (image already present).
 
@@ -152,6 +178,7 @@ The empty-cache figure is almost entirely download time (5.2 GB), so it mostly m
 
 The NVIDIA device plugin was reconfigured to advertise the one GPU as 2 `nvidia.com/gpu` units ([`k8s/sharing/`](k8s/sharing/)), and two vLLM pods (A and B, same model) were scheduled onto it. Raw data: [`results/sharing/`](results/sharing/).
 
+<!-- BEGIN generated: sharing -->
 | Setup | Concurrency | OK | TTFT p50 | Tok/s p50 | E2E p50 | E2E p95 |
 |---|---|---|---|---|---|---|
 | Pod A alone | 1 | 16/16 | 0.013 | 153.1 | 0.431 | 0.436 |
@@ -160,6 +187,7 @@ The NVIDIA device plugin was reconfigured to advertise the one GPU as 2 `nvidia.
 | Pod A, with B also under load | 4 | 48/48 | 0.049 | 72.8 | 0.928 | 0.938 |
 | Pod B, with A also under load | 1 | 48/48 | 0.022 | 71.5 | 0.918 | 0.935 |
 | Pod B, with A also under load | 4 | 48/48 | 0.051 | 71.2 | 0.946 | 0.975 |
+<!-- END generated: sharing -->
 
 - With both pods busy, each pod's per-request speed roughly halved (about 153 to about 72 tokens/s at concurrency 1) and end-to-end latency roughly doubled (0.43 s to about 0.91 s). That is what you would expect if the GPU's compute time is split between the two; I did not profile the scheduler to confirm the mechanism.
 - Caveats: the A-alone baseline used 16 requests per level, the shared runs used 48; A and B were benchmarked concurrently but not synchronised, so the two pods' concurrency levels did not always line up in time; one run each.
@@ -300,12 +328,14 @@ A blocker job took all 16 CPUs, jobs queued behind it, then the blocker was canc
 
 [`slurm/jobs/bench-array.sbatch`](slurm/jobs/bench-array.sbatch) ran 12 tasks (concurrency 1, 2, 4, 8, three repeats each) with `%1`, so only one task loaded the server at a time. The server was the k3s vLLM pod; Slurm only ran the client. All 12 tasks completed with 16/16 requests successful; task run times were 1 to 9 s ([`sacct`](results/slurm/bench/sacct.txt), [table](results/slurm/bench/summary_table.txt), raw JSON/CSV beside it).
 
+<!-- BEGIN generated: slurm-array -->
 | Concurrency | TTFT p50 (s), min to max of 3 | Tok/s p50 | E2E p50 (s) |
 |---|---|---|---|
 | 1 | 0.013 | 144.0 to 144.4 | 0.456 to 0.458 |
 | 2 | 0.021 to 0.022 | 145.7 to 146.0 | 0.460 to 0.461 |
 | 4 | 0.025 | 146.0 to 146.2 | 0.462 to 0.463 |
 | 8 | 0.037 to 0.041 | 145.0 to 145.4 | 0.475 to 0.481 |
+<!-- END generated: slurm-array -->
 
 The client reached vLLM by its ClusterIP, not by port-forward, and the Deployment had since gained tool-calling flags, so these are not directly comparable with the earlier k3s run.
 

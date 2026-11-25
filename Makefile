@@ -8,7 +8,7 @@ PY ?= python3
 
 .PHONY: test lint helm-validate docker-ollama docker-vllm bench-ollama bench-vllm \
         k8s-gpu-plugin k8s-vllm k8s-monitoring k8s-dashboard bench-k8s grafana-password \
-        k8s-timeslicing k8s-single-gpu k8s-tenants isolation-test
+        k8s-timeslicing k8s-single-gpu k8s-tenants isolation-test render render-check
 
 test:
 	$(PY) -m pytest -q benchmark/tests
@@ -104,3 +104,10 @@ k8s-tenants:
 # Needs both tenant vLLMs Ready.
 isolation-test:
 	k8s/tests/isolation-test.sh
+
+# --- README tables from results/ (CI fails if they drift) ---
+render:
+	$(PY) scripts/render-results.py
+
+render-check:
+	$(PY) scripts/render-results.py --check
