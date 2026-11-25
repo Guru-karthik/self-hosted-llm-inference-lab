@@ -106,7 +106,7 @@ Seconds are from scale-up (or `docker run`) to the first successful chat complet
 Source: `results/sharing/a_alone/, results/sharing/a_with_b/, results/sharing/b_with_a/`
 <!-- END generated: sharing -->
 
-With both servers busy, per-request speed at concurrency 1 fell from 153.1 to about 72 tokens/s (71.7 and 71.5), and median latency rose from 0.431 s to 0.912 s and 0.918 s. Both pods saw all 16,303 MiB of GPU memory. Starting the second server needed a fixed KV-cache size, because vLLM counted the other pod's memory against its own budget (`LOG.md`). Time-slicing therefore shares a GPU but neither isolates memory nor guarantees a share of compute.
+With both servers busy, per-request speed at concurrency 1 fell from 153.1 tokens/s (pod A alone) to 71.7 (A) and 71.5 (B), and median latency rose from 0.431 s to 0.912 s and 0.918 s. Both pods saw all 16,303 MiB of GPU memory. Starting the second server needed a fixed KV-cache size, because vLLM counted the other pod's memory against its own budget (`LOG.md`). Time-slicing therefore shares a GPU but neither isolates memory nor guarantees a share of compute.
 
 ### 4.4 Two tenants on Kubernetes
 
@@ -142,3 +142,82 @@ Twelve faults were injected, one run each, with the diagnoses expected from the 
 - Prompt injection: text appended to a real tool result was copied into the answer in 2 of 2 runs. Two attempts through an added log tool never reached the model, which did not call it. A planted "report healthy" instruction reached the model in 1 run; that answer still reported the latency and the queue.
 
 Read-only, fixed-query tools limited what an injected instruction could do to the wording of an answer. They did not stop it changing the wording, so the answer has to be treated as untrusted input by whoever or whatever reads it.
+
+## 5. Threats to validity
+
+**Measurement.**
+
+- One machine under WSL2, with the client and server sharing its CPU. GPU virtualisation and networking may differ from bare-metal Linux.
+- The confidence intervals cover run-to-run noise inside one session. Day-to-day differences were larger: October's single vLLM run at concurrency 1 gave TTFT 0.016 s and 146.5 tokens/s, outside the November intervals, with a different KV-cache size (116,016 against 130,720 tokens).
+- Five runs and 16 requests per run are small samples. At concurrency 16 each run is a single wave of requests.
+- Start-up, sharing and October benchmark figures are single runs or very few.
+- Peak VRAM is whole-GPU memory and includes other processes; vLLM pre-allocates, so it does not show what a model needs.
+
+**Comparison.**
+
+- The engines use different quantisation formats and kernels. Output quality was not measured.
+- Only one tuned Ollama configuration was tried; vLLM was not tuned for this workload either.
+- Short fixed prompts and 64 output tokens. Long contexts and sustained load were not studied.
+
+**Isolation.** The tests show that particular requests were blocked or rejected, not that no other path exists. No container escape, driver attack or resource exhaustion was attempted.
+
+**Agent evaluation.** One run per fault, one 7B 4-bit model, one question that presumes slowness, labels drafted by an AI assistant and accepted by the author, and no human scores yet. A proper study would need repeated runs, several models and neutral questions, faults and labels from people who operate such systems, two blind scorers with measured agreement, and a comparison with plain alert rules.
+
+**Process.** The lab was built with an AI coding assistant. Among the mistakes found and fixed in its test harness were three that could have produced false results (an egress check that could not fail, a race in the fair-share demo, and a load generator that cut off every request). This is a reason to treat any unreviewed check with care; all three are recorded in `LOG.md`.
+
+## 6. Measured and not measured
+
+| Measured | Not measured or not built |
+|---|---|
+| Latency and throughput, one GPU, short prompts | Output quality; long context; sustained or production-like load |
+| Warm-start time; one cold Docker download | Cold download inside the cluster; autoscaling or scale-to-zero on demand |
+| Time-slicing slowdown and lack of memory isolation | MIG or vGPU (not available on this consumer GPU) |
+| Two-tenant network, API and quota checks | Authentication, API gateway, TLS, tenant identity from an identity provider |
+| Slurm priority mechanics on one node | Multi-node jobs, MPI, parallel filesystem, scheduler at scale |
+| Agent tool use on injected faults (unscored) | Agent accuracy; alerting; per-tenant observability |
+| | Federation across sites |
+
+## 7. Reference architecture sketch
+
+Solid boxes were built in this lab, in the limited form described above. **Dashed boxes are a proposal: not built and not tested.**
+
+```mermaid
+flowchart TB
+  user["Researcher or application"]:::proposed --> gw["API gateway<br/>TLS, institutional login,<br/>per-tenant keys and rate limits"]:::proposed
+  gw --> a
+  gw --> b
+  subgraph cluster["Kubernetes cluster (lab: one k3s node, one GPU)"]
+    subgraph a["tenant-a: quota, RBAC, NetworkPolicy"]
+      va["vLLM"]:::built --- ca[("model cache")]:::built
+    end
+    subgraph b["tenant-b: quota, RBAC, NetworkPolicy"]
+      vb["vLLM"]:::built --- cb[("model cache")]:::built
+    end
+    prom["Prometheus, Grafana, DCGM<br/>(shared, no tenant separation)"]:::built
+    fetch["Verified model fetch<br/>(checksums, size limit, safetensors only)"]:::proposed
+    obs["Per-tenant metrics, logs, limits"]:::proposed
+    gpu["Whole GPUs or MIG partitions per tenant"]:::proposed
+    ts["Time-sliced GPU<br/>(no memory isolation)"]:::built
+  end
+  va --> ts
+  vb --> ts
+  prom --> va
+  prom --> vb
+  ops["Read-only MCP tools + local model"]:::built --> prom
+  fetch -.-> ca
+  fetch -.-> cb
+  obs -.-> prom
+  gpu -.-> va
+  batch["Slurm (lab: sandbox, not coordinated)"]:::built -.- ts
+  sites["Further sites: GitOps rollout,<br/>identity federation, routing"]:::proposed -.-> gw
+  classDef built fill:#e8f1fb,stroke:#1f5a96,stroke-width:2px,color:#111
+  classDef proposed fill:#ffffff,stroke:#888,stroke-dasharray:6 4,color:#333
+```
+
+What I would do first for a real service, as a judgement from this lab and not a tested result:
+
+1. **Put authentication in front of the model server.** It has none here, and every other tenant control is weaker without it.
+2. **Give each tenant whole GPUs or MIG partitions** where isolation matters; keep time-slicing for trusted, low-stakes sharing.
+3. **Make model weights a managed, verified artefact** rather than files copied into volumes by hand.
+4. **Keep operations agents read-only**, treat their input and output as untrusted, and evaluate them on a site's own incidents before relying on them.
+5. **Decide how batch and inference share hardware** before buying it; start with a static split and measure idle time.
