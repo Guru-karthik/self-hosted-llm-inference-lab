@@ -5,6 +5,8 @@ Usage: python mcp/agent.py --llm-url http://localhost:8001/v1 --model qwen2.5-7b
          --prometheus-url http://localhost:9090
 The model has no other tools: no shell, no file access, no free-form queries.
 Every MCP tool call is logged by the server (MCP_TOOL_LOG); the transcript is printed.
+--server swaps in another MCP server script (used by mcp/eval); --transcript-json saves
+the messages, tool calls and final answer.
 """
 from __future__ import annotations
 
@@ -39,8 +41,19 @@ def text_of(result) -> str:
     return "\n".join(b.text for b in result.content if isinstance(b, TextContent)) or "(empty result)"
 
 
+def save_transcript(path: str | None, messages: list, tools: list, finished: bool) -> None:
+    """Write the whole exchange as JSON so that a run can be reviewed and scored later."""
+    if not path:
+        return
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    answer = messages[-1].get("content") if finished else None
+    record = {"finished": finished, "final_answer": answer, "messages": messages,
+              "tools_offered": [t["function"]["name"] for t in tools]}
+    Path(path).write_text(json.dumps(record, indent=2) + "\n")
+
+
 async def run(args) -> int:
-    server_path = Path(__file__).resolve().parent / "server.py"
+    server_path = Path(args.server or Path(__file__).resolve().parent / "server.py")
     params = StdioServerParameters(
         command=sys.executable,
         args=[str(server_path)],
@@ -61,6 +74,7 @@ async def run(args) -> int:
             calls = msg.get("tool_calls") or []
             messages.append({k: v for k, v in msg.items() if k in ("role", "content", "tool_calls") and v is not None})
             if not calls:
+                save_transcript(args.transcript_json, messages, tools, finished=True)
                 print("--- final answer ---")
                 print(msg.get("content", ""))
                 return 0
@@ -77,6 +91,7 @@ async def run(args) -> int:
                     output = text_of(result)
                 print(f"[step {step}] tool call: {name}({arguments}) -> {output}")
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": output})
+        save_transcript(args.transcript_json, messages, tools, finished=False)
         print("stopped: step limit reached without a final answer", file=sys.stderr)
         return 1
 
@@ -88,6 +103,8 @@ def main() -> int:
     p.add_argument("--prometheus-url", default="http://localhost:9090")
     p.add_argument("--tool-log", default="logs/mcp-tool-calls.jsonl")
     p.add_argument("--question", default=QUESTION)
+    p.add_argument("--server", help="MCP server script (default: server.py next to this file)")
+    p.add_argument("--transcript-json", help="write the full exchange to this JSON file")
     return asyncio.run(run(p.parse_args()))
 
 

@@ -13,6 +13,7 @@ PY ?= python3
 test:
 	$(PY) -m pytest -q benchmark/tests
 	$(PY) -m pytest -q mcp/tests
+	$(PY) -m pytest -q mcp/eval/tests
 
 lint:
 	yamllint .
