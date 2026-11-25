@@ -40,7 +40,8 @@ jobs:
         run: |
           kubeconform -strict -summary -ignore-missing-schemas \
             k8s/vllm k8s/tests k8s/monitoring/vllm-servicemonitor.yaml \
-            k8s/monitoring/dashboard-configmap.yaml
+            k8s/monitoring/dashboard-configmap.yaml \
+            k8s/tenants/test-client.yaml
 
       - name: kubeconform (rendered tenant overlays)
         run: |

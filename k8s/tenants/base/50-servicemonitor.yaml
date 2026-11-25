@@ -1,0 +1,15 @@
+# Lets the shared Prometheus scrape this tenant's vLLM (needs the allow policy above).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vllm
+  labels:
+    app: vllm
+spec:
+  selector:
+    matchLabels:
+      app: vllm
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

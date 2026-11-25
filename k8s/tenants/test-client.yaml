@@ -1,0 +1,24 @@
+# The one namespace allowed to call tenant vLLM on port 8000, with a probe pod for the
+# isolation test. Reuses the vLLM image (already on the node) for its Python.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-client
+  labels:
+    lab/role: test-client
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe
+  namespace: test-client
+spec:
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  containers:
+    - name: probe
+      image: vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
+      command: ["sleep", "7200"]
+      resources:
+        requests: {cpu: 100m, memory: 64Mi}
+        limits: {cpu: 500m, memory: 256Mi}

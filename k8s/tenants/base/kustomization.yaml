@@ -8,3 +8,5 @@ resources:
   - 10-pvc.yaml
   - 20-deployment.yaml
   - 30-service.yaml
+  - 40-networkpolicy.yaml
+  - 50-servicemonitor.yaml
