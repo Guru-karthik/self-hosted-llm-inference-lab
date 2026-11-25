@@ -1,0 +1,20 @@
+OLLAMA_CONTEXT_LENGTH:4096
+OLLAMA_FLASH_ATTENTION:false
+OLLAMA_KV_CACHE_TYPE:
+OLLAMA_MAX_LOADED_MODELS:0
+OLLAMA_MAX_QUEUE:512
+OLLAMA_NUM_PARALLEL:8
+NAME                          ID              SIZE      PROCESSOR    CONTEXT    RUNNER      UNTIL              
+qwen2.5:7b-instruct-q4_K_M    845dbda0ea48    6.5 GB    100% GPU     4096       llamacpp    4 minutes from now    
+n_ctx = 4096
+n_ctx = 4096
+n_ctx = 4096
+n_ctx = 4096
+llama_context: n_seq_max             = 8
+llama_context: n_ctx_seq             = 4096
+llama_context: kv_unified            = false
+llama_context: n_ctx_seq (4096) < n_ctx_train (32768) -- the full capacity of the model will not be utilized
+srv    load_model: initializing, n_slots = 8, n_ctx_slot = 4096, kv_unified = 'false'
+slot   load_model: id  0 | task -1 | new slot, n_ctx = 4096
+slot   load_model: id  1 | task -1 | new slot, n_ctx = 4096
+slot   load_model: id  2 | task -1 | new slot, n_ctx = 4096
