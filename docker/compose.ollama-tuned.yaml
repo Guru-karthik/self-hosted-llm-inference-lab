@@ -1,0 +1,10 @@
+# Phase 3 override: Ollama with its concurrency settings set to match the vLLM server,
+# instead of defaults. Use on top of compose.yaml:
+#   docker compose -f docker/compose.yaml -f docker/compose.ollama-tuned.yaml --profile ollama up -d ollama
+# NUM_PARALLEL=8 matches vLLM --max-num-seqs 8; CONTEXT_LENGTH=4096 matches
+# --max-model-len 4096 (Ollama allocates context per parallel slot).
+services:
+  ollama:
+    environment:
+      OLLAMA_NUM_PARALLEL: "8"
+      OLLAMA_CONTEXT_LENGTH: "4096"
