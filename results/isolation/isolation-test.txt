@@ -1,0 +1,127 @@
+# Tenant isolation test, 2026-11-25T12:33:16+01:00, k3s version v1.36.5+k3s1 (3dd98cc5)
+NAME                    READY   STATUS    RESTARTS   AGE
+vllm-7cbf98f8bd-nwjqp   1/1     Running   0          7m54s
+NAME                    READY   STATUS    RESTARTS   AGE
+vllm-7cbf98f8bd-b7bp7   1/1     Running   0          5m39s
+
+## 0. Baseline with NO NetworkPolicies in the tenants
+networkpolicy.networking.k8s.io "allow-dns" deleted from tenant-a namespace
+networkpolicy.networking.k8s.io "allow-prometheus-scrape" deleted from tenant-a namespace
+networkpolicy.networking.k8s.io "allow-test-client" deleted from tenant-a namespace
+networkpolicy.networking.k8s.io "default-deny" deleted from tenant-a namespace
+networkpolicy.networking.k8s.io "allow-dns" deleted from tenant-b namespace
+networkpolicy.networking.k8s.io "allow-prometheus-scrape" deleted from tenant-b namespace
+networkpolicy.networking.k8s.io "allow-test-client" deleted from tenant-b namespace
+networkpolicy.networking.k8s.io "default-deny" deleted from tenant-b namespace
+$ [pod in tenant-a] GET http://vllm.tenant-b.svc.cluster.local:8000/v1/models
+    resolved vllm.tenant-b.svc.cluster.local -> 10.43.106.76
+    HTTP 200
+PASS  baseline: tenant-a reaches tenant-b (expected allowed)
+$ [pod in isolation-neutral] GET http://vllm.tenant-b.svc.cluster.local:8000/v1/models
+    resolved vllm.tenant-b.svc.cluster.local -> 10.43.106.76
+    HTTP 200
+PASS  baseline: unrelated namespace reaches tenant-b (expected allowed)
+$ [pod in tenant-a] GET https://kubernetes.default.svc.cluster.local/version
+    resolved kubernetes.default.svc.cluster.local -> 10.43.0.1
+    HTTP 401
+PASS  baseline: tenant-a pod can reach the API server (expected allowed)
+
+## 1. Network, with NetworkPolicies
+NAME                      POD-SELECTOR   AGE
+allow-dns                 <none>         1s
+allow-prometheus-scrape   app=vllm       1s
+allow-test-client         app=vllm       1s
+default-deny              <none>         1s
+NAME                      POD-SELECTOR   AGE
+allow-dns                 <none>         0s
+allow-prometheus-scrape   app=vllm       0s
+allow-test-client         app=vllm       0s
+default-deny              <none>         0s
+$ [pod in tenant-a] GET http://vllm.tenant-b.svc.cluster.local:8000/v1/models
+    resolved vllm.tenant-b.svc.cluster.local -> 10.43.106.76
+    CONNECT FAILED URLError [Errno 111] Connection refused
+    command terminated with exit code 2
+PASS  tenant-a cannot reach tenant-b (expected blocked)
+$ [pod in tenant-b] GET http://vllm.tenant-a.svc.cluster.local:8000/v1/models
+    resolved vllm.tenant-a.svc.cluster.local -> 10.43.186.96
+    CONNECT FAILED URLError [Errno 111] Connection refused
+    command terminated with exit code 2
+PASS  tenant-b cannot reach tenant-a (expected blocked)
+$ [pod in isolation-neutral] GET http://vllm.tenant-b.svc.cluster.local:8000/v1/models
+    resolved vllm.tenant-b.svc.cluster.local -> 10.43.106.76
+    CONNECT FAILED URLError [Errno 111] Connection refused
+    command terminated with exit code 2
+PASS  ingress rule alone blocks an unrelated namespace (expected blocked)
+$ [pod in test-client] GET http://vllm.tenant-a.svc.cluster.local:8000/v1/models
+    resolved vllm.tenant-a.svc.cluster.local -> 10.43.186.96
+    HTTP 200
+PASS  control: test-client reaches tenant-a (expected allowed)
+$ [pod in test-client] GET http://vllm.tenant-b.svc.cluster.local:8000/v1/models
+    resolved vllm.tenant-b.svc.cluster.local -> 10.43.106.76
+    HTTP 200
+PASS  control: test-client reaches tenant-b (expected allowed)
+$ [pod in tenant-a] GET https://kubernetes.default.svc.cluster.local/version
+    resolved kubernetes.default.svc.cluster.local -> 10.43.0.1
+    CONNECT FAILED URLError [Errno 111] Connection refused
+    command terminated with exit code 2
+PASS  tenant-a pod has no egress to the API server (expected blocked)
+$ Prometheus query: up{namespace="tenant-a",job="vllm"}
+    {"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"up","container":"vllm","endpoint":"http","instance":"10.42.0.231:8000","job":"vllm","namespace":"tenant-a","pod":"vllm-7cbf98f8bd-nwjqp","service":"vllm"},"value":[1795606466.470,"1"]}]}}
+PASS  Prometheus still scrapes tenant-a (expected up)
+$ Prometheus query: up{namespace="tenant-b",job="vllm"}
+    {"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"up","container":"vllm","endpoint":"http","instance":"10.42.0.232:8000","job":"vllm","namespace":"tenant-b","pod":"vllm-7cbf98f8bd-b7bp7","service":"vllm"},"value":[1795606466.493,"1"]}]}}
+PASS  Prometheus still scrapes tenant-b (expected up)
+$ [from the node itself] curl http://10.43.106.76:8000/v1/models
+    HTTP 200
+NOTE  the node itself is NOT blocked by these policies (HTTP 200)
+
+## 2. API access with tenant-a's ServiceAccount token
+secret/canary created
+$ GET /api/v1/namespaces/tenant-a/pods
+    HTTP 200
+    PodList
+PASS  control: tenant-a user lists its own pods (expected 200)
+$ GET /api/v1/namespaces/tenant-b/pods
+    HTTP 403
+    pods is forbidden: User "system:serviceaccount:tenant-a:tenant-user" cannot list resource "pods" in API group "" in the namespace "tenant-b"
+PASS  tenant-a user cannot list tenant-b pods (expected 403)
+$ GET /api/v1/namespaces/tenant-b/secrets
+    HTTP 403
+    secrets is forbidden: User "system:serviceaccount:tenant-a:tenant-user" cannot list resource "secrets" in API group "" in the namespace "tenant-b"
+PASS  tenant-a user cannot list tenant-b secrets (expected 403)
+$ GET /api/v1/namespaces/tenant-b/secrets/canary
+    HTTP 403
+    secrets "canary" is forbidden: User "system:serviceaccount:tenant-a:tenant-user" cannot get resource "secrets" in API group "" in the namespace "tenant-b"
+PASS  tenant-a user cannot read a tenant-b secret (expected 403)
+$ GET /api/v1/namespaces/tenant-a/secrets
+    HTTP 403
+    secrets is forbidden: User "system:serviceaccount:tenant-a:tenant-user" cannot list resource "secrets" in API group "" in the namespace "tenant-a"
+PASS  tenant-a user cannot list secrets in its own namespace (expected 403)
+$ GET /api/v1/nodes
+    HTTP 403
+    nodes is forbidden: User "system:serviceaccount:tenant-a:tenant-user" cannot list resource "nodes" in API group "" at the cluster scope
+PASS  tenant-a user cannot list nodes (expected 403)
+
+## 3. Quota
+Name:                    tenant-quota
+Namespace:               tenant-a
+Resource                 Used    Hard
+--------                 ----    ----
+limits.memory            8448Mi  10Gi
+persistentvolumeclaims   1       1
+pods                     2       5
+requests.cpu             1100m   4
+requests.memory          4160Mi  6Gi
+requests.nvidia.com/gpu  1       1
+requests.storage         20Gi    20Gi
+$ create: pod asking for a second GPU unit
+    Error from server (Forbidden): error when creating "STDIN": pods "over-gpu" is forbidden: exceeded quota: tenant-quota, requested: requests.nvidia.com/gpu=1, used: requests.nvidia.com/gpu=1, limited: requests.nvidia.com/gpu=1
+PASS  pod asking for a second GPU unit (expected rejected)
+$ create: pod whose memory request exceeds the quota
+    Error from server (Forbidden): error when creating "STDIN": pods "over-memory" is forbidden: exceeded quota: tenant-quota, requested: limits.memory=3Gi,requests.memory=3Gi, used: limits.memory=8448Mi,requests.memory=4160Mi, limited: limits.memory=10Gi,requests.memory=6Gi
+PASS  pod whose memory request exceeds the quota (expected rejected)
+$ create: PVC beyond the storage and claim quota
+    Error from server (Forbidden): error when creating "STDIN": persistentvolumeclaims "over-storage" is forbidden: exceeded quota: tenant-quota, requested: persistentvolumeclaims=1,requests.storage=5Gi, used: persistentvolumeclaims=1,requests.storage=20Gi, limited: persistentvolumeclaims=1,requests.storage=20Gi
+PASS  PVC beyond the storage and claim quota (expected rejected)
+
+## Result: 0 failed check(s)

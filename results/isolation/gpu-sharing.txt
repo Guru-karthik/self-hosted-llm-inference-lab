@@ -1,0 +1,27 @@
+# Both tenants running on the one physical GPU, 2026-11-25T12:35:30+01:00
+
+$ kubectl get node (allocatable nvidia.com/gpu)
+2
+
+$ nvidia-smi (host)
+memory.total [MiB], memory.used [MiB]
+16303 MiB, 14494 MiB
+
+$ kubectl -n tenant-a exec deploy/vllm -- nvidia-smi  (from inside the tenant)
+memory.total [MiB], memory.used [MiB]
+16303 MiB, 14494 MiB
+$ one chat completion from tenant-a (via ClusterIP, from the node)
+'ready' 2 completion tokens
+
+$ kubectl -n tenant-b exec deploy/vllm -- nvidia-smi  (from inside the tenant)
+memory.total [MiB], memory.used [MiB]
+16303 MiB, 14496 MiB
+$ one chat completion from tenant-b (via ClusterIP, from the node)
+'ready' 2 completion tokens
+
+tenant-a: reserved 1.0 GiB memory for KV Cache
+tenant-a: GPU KV cache size: 18,720 tokens
+tenant-a: init engine (profile, create kv cache, warmup model) took 90.48 s
+tenant-b: reserved 1.0 GiB memory for KV Cache
+tenant-b: GPU KV cache size: 18,720 tokens
+tenant-b: init engine (profile, create kv cache, warmup model) took 89.48 s
