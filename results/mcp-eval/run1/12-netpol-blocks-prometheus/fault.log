@@ -1,0 +1,4 @@
+$ 12-netpol-blocks-prometheus.sh inject  (2026-11-25T14:58:28+00:00)
+networkpolicy.networking.k8s.io/eval-deny-ingress created
+$ 12-netpol-blocks-prometheus.sh restore  (2026-11-25T14:59:57+00:00)
+networkpolicy.networking.k8s.io "eval-deny-ingress" deleted from llm-inference namespace

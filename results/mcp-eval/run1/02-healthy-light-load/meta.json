@@ -1,0 +1,23 @@
+{
+  "case": "02-healthy-light-load",
+  "fault": "02-healthy-light-load",
+  "settle_seconds": 90,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T13:45:08+00:00",
+  "agent_started": "2026-11-25T13:46:35+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": 1.0,
+    "requests_running": 0.0,
+    "requests_waiting": 0.0,
+    "kv_cache_usage_ratio": 0.0,
+    "p95_latency_seconds": 0.6438533895556277,
+    "p95_ttft_seconds": 0.037188815558112445,
+    "error_rate": 0.0,
+    "gpu_utilisation_percent": 97.0,
+    "gpu_memory_used_mib": 15384.0,
+    "gpu_temperature_celsius": 53.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T13:46:39+00:00"
+}

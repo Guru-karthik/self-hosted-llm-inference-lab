@@ -1,0 +1,5 @@
+$ 08-pod-restarting.sh inject  (2026-11-25T14:27:43+00:00)
+pod "vllm-c57fc496f-kvhx2" deleted from llm-inference namespace
+$ 08-pod-restarting.sh restore  (2026-11-25T14:28:15+00:00)
+Waiting for deployment "vllm" rollout to finish: 0 of 1 updated replicas are available...
+deployment "vllm" successfully rolled out

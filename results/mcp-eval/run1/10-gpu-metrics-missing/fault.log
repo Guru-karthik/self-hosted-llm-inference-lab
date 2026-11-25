@@ -1,0 +1,6 @@
+$ 10-gpu-metrics-missing.sh inject  (2026-11-25T14:43:55+00:00)
+daemonset.apps/dcgm-dcgm-exporter patched
+$ 10-gpu-metrics-missing.sh restore  (2026-11-25T14:45:25+00:00)
+daemonset.apps/dcgm-dcgm-exporter patched
+Waiting for daemon set "dcgm-dcgm-exporter" rollout to finish: 0 of 1 updated pods are available...
+daemon set "dcgm-dcgm-exporter" successfully rolled out

@@ -1,0 +1,23 @@
+{
+  "case": "06-client-aborts",
+  "fault": "06-client-aborts",
+  "settle_seconds": 90,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T14:12:35+00:00",
+  "agent_started": "2026-11-25T14:14:02+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": 1.0,
+    "requests_running": 0.0,
+    "requests_waiting": 0.0,
+    "kv_cache_usage_ratio": 0.0,
+    "p95_latency_seconds": null,
+    "p95_ttft_seconds": 0.04096153846153843,
+    "error_rate": null,
+    "gpu_utilisation_percent": 27.0,
+    "gpu_memory_used_mib": 15356.0,
+    "gpu_temperature_celsius": 49.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T14:14:07+00:00"
+}

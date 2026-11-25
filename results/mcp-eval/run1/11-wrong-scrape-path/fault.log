@@ -1,0 +1,4 @@
+$ 11-wrong-scrape-path.sh inject  (2026-11-25T14:51:05+00:00)
+servicemonitor.monitoring.coreos.com/vllm patched
+$ 11-wrong-scrape-path.sh restore  (2026-11-25T14:52:34+00:00)
+servicemonitor.monitoring.coreos.com/vllm configured

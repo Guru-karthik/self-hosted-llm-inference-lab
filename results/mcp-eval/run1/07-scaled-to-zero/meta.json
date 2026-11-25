@@ -1,0 +1,23 @@
+{
+  "case": "07-scaled-to-zero",
+  "fault": "07-scaled-to-zero",
+  "settle_seconds": 90,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T14:18:57+00:00",
+  "agent_started": "2026-11-25T14:20:24+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": null,
+    "requests_running": null,
+    "requests_waiting": null,
+    "kv_cache_usage_ratio": null,
+    "p95_latency_seconds": null,
+    "p95_ttft_seconds": null,
+    "error_rate": null,
+    "gpu_utilisation_percent": 4.0,
+    "gpu_memory_used_mib": 8091.0,
+    "gpu_temperature_celsius": 39.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T14:22:53+00:00"
+}

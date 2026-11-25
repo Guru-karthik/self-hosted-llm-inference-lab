@@ -1,0 +1,23 @@
+{
+  "case": "08-pod-restarting",
+  "fault": "08-pod-restarting",
+  "settle_seconds": 30,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T14:27:43+00:00",
+  "agent_started": "2026-11-25T14:28:12+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": 0.0,
+    "requests_running": null,
+    "requests_waiting": null,
+    "kv_cache_usage_ratio": null,
+    "p95_latency_seconds": null,
+    "p95_ttft_seconds": null,
+    "error_rate": null,
+    "gpu_utilisation_percent": 3.0,
+    "gpu_memory_used_mib": 7441.0,
+    "gpu_temperature_celsius": 43.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T14:29:50+00:00"
+}

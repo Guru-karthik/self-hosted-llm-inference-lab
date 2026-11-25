@@ -1,0 +1,23 @@
+{
+  "case": "05-long-outputs",
+  "fault": "05-long-outputs",
+  "settle_seconds": 150,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T14:05:13+00:00",
+  "agent_started": "2026-11-25T14:07:38+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": 1.0,
+    "requests_running": 2.0,
+    "requests_waiting": 0.0,
+    "kv_cache_usage_ratio": 0.2027373823781009,
+    "p95_latency_seconds": 17.75,
+    "p95_ttft_seconds": 0.175,
+    "error_rate": 0.0,
+    "gpu_utilisation_percent": 97.0,
+    "gpu_memory_used_mib": 15356.0,
+    "gpu_temperature_celsius": 63.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T14:07:45+00:00"
+}

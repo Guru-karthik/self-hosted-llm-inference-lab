@@ -1,0 +1,6 @@
+$ 07-scaled-to-zero.sh inject  (2026-11-25T14:18:57+00:00)
+deployment.apps/vllm scaled
+$ 07-scaled-to-zero.sh restore  (2026-11-25T14:20:28+00:00)
+deployment.apps/vllm scaled
+Waiting for deployment "vllm" rollout to finish: 0 of 1 updated replicas are available...
+deployment "vllm" successfully rolled out

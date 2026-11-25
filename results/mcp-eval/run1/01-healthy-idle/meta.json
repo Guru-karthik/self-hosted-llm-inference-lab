@@ -1,0 +1,23 @@
+{
+  "case": "01-healthy-idle",
+  "fault": "01-healthy-idle",
+  "settle_seconds": 0,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T13:40:14+00:00",
+  "agent_started": "2026-11-25T13:40:14+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": 1.0,
+    "requests_running": 0.0,
+    "requests_waiting": 0.0,
+    "kv_cache_usage_ratio": 0.0,
+    "p95_latency_seconds": null,
+    "p95_ttft_seconds": null,
+    "error_rate": null,
+    "gpu_utilisation_percent": 0.0,
+    "gpu_memory_used_mib": 15403.0,
+    "gpu_temperature_celsius": 37.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T13:40:17+00:00"
+}
