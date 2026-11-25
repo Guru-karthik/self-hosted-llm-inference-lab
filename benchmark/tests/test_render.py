@@ -26,7 +26,13 @@ def test_interval_prints_mean_and_half_width():
     assert render_results.interval(summary, "m", 2) == "2.00 ± 0.25"
 
 
-def test_readme_tables_match_the_result_files():
-    readme = (ROOT / "README.md").read_text()
-    for name, build in render_results.TABLES.items():
-        assert render_results.render(readme, name, build()) == readme, f"table {name} is out of date"
+@pytest.mark.parametrize("path", list(render_results.TARGETS))
+def test_committed_tables_match_the_result_files(path):
+    names, with_source = render_results.TARGETS[path]
+    text = (ROOT / path).read_text()
+    assert render_results.render_document(text, names, with_source) == text, f"{path} is out of date"
+
+
+def test_report_blocks_name_their_source_files():
+    assert render_results.block("sharing", True).endswith("results/sharing/b_with_a/`")
+    assert "Source:" not in render_results.block("sharing", False)

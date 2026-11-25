@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the README's benchmark tables from files in results/, so numbers cannot drift.
+"""Generate the benchmark tables of the README and the report from files in results/, so numbers cannot drift.
 
     python scripts/render-results.py          # rewrite the blocks in README.md
     python scripts/render-results.py --check  # exit 1 if README.md is out of date
 
-Each table sits between <!-- BEGIN generated: NAME --> and <!-- END generated: NAME -->.
+Each table sits between <!-- BEGIN generated: NAME --> and <!-- END generated: NAME -->
+in README.md or docs/report.md. In the report each table also names its source files.
 Result files are named explicitly: a new run changes the README only on purpose.
 """
 from __future__ import annotations
@@ -126,6 +127,32 @@ TABLES = {"single-runs": single_runs, "startup": startup, "sharing": sharing,
           "repeated-runs": repeated_runs, "slurm-array": slurm_array}
 
 
+SOURCES = {
+    "single-runs": "results/ollama_20261029T112426.441496Z.json, results/vllm_20261029T121246.269036Z.json, "
+                   "results/k8s/vllm_20261029T154626.064016Z.json",
+    "startup": "results/startup/*.csv",
+    "sharing": "results/sharing/a_alone/, results/sharing/a_with_b/, results/sharing/b_with_a/",
+    "repeated-runs": "results/phase3/vllm/, results/phase3/ollama-default/, results/phase3/ollama-tuned/",
+    "slurm-array": "results/slurm/bench/",
+}
+# Document -> (tables it contains, whether each table is followed by its source files).
+TARGETS = {
+    "README.md": (list(TABLES), False),
+    "docs/report.md": (["repeated-runs", "startup", "sharing"], True),
+}
+
+
+def block(name: str, with_source: bool) -> str:
+    body = TABLES[name]()
+    return f"{body}\n\nSource: `{SOURCES[name]}`" if with_source else body
+
+
+def render_document(text: str, names: list[str], with_source: bool) -> str:
+    for name in names:
+        text = render(text, name, block(name, with_source))
+    return text
+
+
 def render(text: str, name: str, body: str) -> str:
     pattern = re.compile(f"(<!-- BEGIN generated: {name} -->\n).*?(\n<!-- END generated: {name} -->)", re.S)
     new, count = pattern.subn(lambda m: m.group(1) + body + m.group(2), text)
@@ -138,17 +165,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    readme = ROOT / "README.md"
-    old = readme.read_text()
-    new = old
-    for name, builder in TABLES.items():
-        new = render(new, name, builder())
-    if args.check:
-        if new != old:
-            print("README.md tables differ from results/; run scripts/render-results.py", file=sys.stderr)
-            return 1
-        return 0
-    readme.write_text(new)
+    stale = []
+    for path, (names, with_source) in TARGETS.items():
+        document = ROOT / path
+        old = document.read_text()
+        new = render_document(old, names, with_source)
+        if new == old:
+            continue
+        stale.append(path)
+        if not args.check:
+            document.write_text(new)
+    if args.check and stale:
+        print(f"Tables differ from results/ in {', '.join(stale)}; run scripts/render-results.py", file=sys.stderr)
+        return 1
     return 0
 
 
