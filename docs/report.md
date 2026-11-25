@@ -171,6 +171,7 @@ Read-only, fixed-query tools limited what an injected instruction could do to th
 |---|---|
 | Latency and throughput, one GPU, short prompts | Output quality; long context; sustained or production-like load |
 | Warm-start time; one cold Docker download | Cold download inside the cluster; autoscaling or scale-to-zero on demand |
+| Model files verified against pinned digests (`file://` source only) | In-cluster model download; signatures; scanning |
 | Time-slicing slowdown and lack of memory isolation | MIG or vGPU (not available on this consumer GPU) |
 | Two-tenant network, API and quota checks | Authentication, API gateway, TLS, tenant identity from an identity provider |
 | Slurm priority mechanics on one node | Multi-node jobs, MPI, parallel filesystem, scheduler at scale |
@@ -194,7 +195,7 @@ flowchart TB
       vb["vLLM"]:::built --- cb[("model cache")]:::built
     end
     prom["Prometheus, Grafana, DCGM<br/>(shared, no tenant separation)"]:::built
-    fetch["Verified model fetch<br/>(checksums, size limit, safetensors only)"]:::proposed
+    fetch["Verified model fetch Job<br/>(lab: file:// source, admin only)"]:::built
     obs["Per-tenant metrics, logs, limits"]:::proposed
     gpu["Whole GPUs or MIG partitions per tenant"]:::proposed
     ts["Time-sliced GPU<br/>(no memory isolation)"]:::built
@@ -204,6 +205,7 @@ flowchart TB
   prom --> va
   prom --> vb
   ops["Read-only MCP tools + local model"]:::built --> prom
+  fetch --> store[("verified model volume")]:::built
   fetch -.-> ca
   fetch -.-> cb
   obs -.-> prom
@@ -218,6 +220,6 @@ What I would do first for a real service, as a judgement from this lab and not a
 
 1. **Put authentication in front of the model server.** It has none here, and every other tenant control is weaker without it.
 2. **Give each tenant whole GPUs or MIG partitions** where isolation matters; keep time-slicing for trusted, low-stakes sharing.
-3. **Make model weights a managed, verified artefact** rather than files copied into volumes by hand.
+3. **Make model weights a managed, verified artefact** rather than files copied into volumes by hand. The lab has the verification step only ([model-requests.md](model-requests.md)); the dashed arrows to tenant caches are not built.
 4. **Keep operations agents read-only**, treat their input and output as untrusted, and evaluate them on a site's own incidents before relying on them.
 5. **Decide how batch and inference share hardware** before buying it; start with a static split and measure idle time.

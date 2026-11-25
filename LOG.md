@@ -284,3 +284,10 @@ Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
 - Every decimal and thousands-separated number in the prose was checked to occur in README.md or LOG.md (the only miss was a section number). That shows the number exists there, not that each sentence uses it correctly.
 - The mermaid diagram was not rendered locally (no renderer installed).
 - Phase E verdicts were still not scored, and the report says so.
+
+## 2026-11-25 — Phase M (optional): verified model fetch
+- Manifest: `python3 k8s/model-fetch/make-manifest.py Qwen/Qwen2.5-7B-Instruct-AWQ b25037543e9394b818fdfca67ab2a00ecc7dd641 ...` (run on the host against the Hugging Face API). All sizes matched the cached files.
+- `k8s/model-fetch/run-checks.sh`: Job copies from `file://` (the `hf-cache` volume, read-only) to a new 20 Gi PVC `model-store`. Pass run 18 s the first time, 12 s the second (single observations, data likely in page cache; not a download time). Three refusal runs refused. 
+- `k8s/model-fetch/serve-check.sh`: `llm-inference/vllm` patched to `model-store`, one completion, then `k8s/vllm/20-deployment.yaml` re-applied (claim back to `hf-cache`).
+- Problem caught before running: the first draft of `run-checks.sh` deleted the Job and ConfigMap with one wrong `kubectl delete` command and rewrote the Job by text replacement; both were changed.
+- Left on the machine: PVC `model-store` (about 5.2 GiB used). `llm-inference` is now at its limit of 2 volume claims.

@@ -12,7 +12,7 @@ A shorter read: the [technical report](docs/report.md) (question, method, result
 |---|---|
 | `docker/compose.yaml`, `scripts/start-runtime.sh` | Digest-pinned Ollama and vLLM services; the script runs one engine at a time on the GPU |
 | `benchmark/` | Python benchmark client (OpenAI-compatible streaming API) and pytest tests for parsing and statistics |
-| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/`, `slurm/`, `isolation/`, `mcp-eval/`, `phase3/` |
+| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/`, `slurm/`, `isolation/`, `mcp-eval/`, `phase3/`, `model-fetch/` |
 | `k8s/vllm/` | Namespace + ResourceQuota, model-cache PVC, vLLM Deployment, Service |
 | `k8s/monitoring/` | Helm values for kube-prometheus-stack and the DCGM exporter, vLLM ServiceMonitor, dashboard ConfigMap |
 | `dashboards/` | Grafana dashboard JSON (11 panels) |
@@ -21,6 +21,7 @@ A shorter read: the [technical report](docs/report.md) (question, method, result
 | `k8s/tenants/`, `k8s/tests/isolation-test.sh` | Two tenant namespaces (kustomize base and overlays), weight loader, automated isolation test |
 | `mcp/` | Read-only Prometheus MCP server, tool-calling agent, tests |
 | `slurm/`, `scripts/setup-slurm-wsl.sh` | Single-node Slurm sandbox: config, scheduling demos, job scripts, Apptainer test; setup needs sudo |
+| `k8s/model-fetch/` | Job that verifies model files against a pinned manifest |
 | `mcp/eval/` | Labelled fault injection, runner, score sheets, prompt-injection cases |
 | `docs/` | Write-ups: a pod download problem, and a [design note on Slurm and Kubernetes sharing GPUs](docs/slurm-vs-kubernetes.md) |
 | `.github/workflows/ci.yaml`, `Makefile` | CI (yamllint, pytest, kubeconform, helm lint) and reproduction targets |
@@ -305,6 +306,25 @@ Both servers answered a chat completion; engine initialisation took 90.48 s and 
 
 Not a secure multi-tenant platform. The vLLM API has no authentication or TLS; tenants are two namespaces operated by one admin. The test shows these specific requests being blocked or rejected on one node at one time, not that no path exists: there was no attempt to escape a container, attack through the GPU driver, or exhaust shared resources. The RBAC identity is a ServiceAccount token, not a person from an identity provider. Pod Security admission, per-tenant secrets encryption, egress control beyond default deny, and per-tenant dashboards or metric access control were not done: Prometheus is shared and unrestricted. Performance with both tenants loaded was not re-measured here.
 
+## Verified model fetch
+
+[`k8s/model-fetch/`](k8s/model-fetch/) replaces the hand copy of weights with a Kubernetes Job that checks them against a [pinned manifest](k8s/model-fetch/manifests/qwen2.5-7b-awq.json) of the publisher's sizes and digests (11 files, 5,582,398,839 bytes), enforces a size limit, allows only safetensors weights and refuses a `config.json` that asks for custom code. Nothing is published unless everything passes. How a tenant would ask for a model: [docs/model-requests.md](docs/model-requests.md).
+
+**The source was a `file://` copy of the already-filled volume**, because pods here could not download from Hugging Face. No in-cluster download was tested.
+
+| Run in the cluster ([raw](results/model-fetch/)) | Outcome |
+|---|---|
+| Real manifest | All 11 files verified and published |
+| A wrong digest for `config.json` in the manifest | Refused: `git-sha1 mismatch` |
+| Size limit 1,000,000,000 bytes | Refused before copying |
+| A `pytorch_model.bin` entry | Refused: file type not allowed |
+
+vLLM was then pointed at the verified volume, answered a chat completion, and was restored ([output](results/model-fetch/serve_check.txt)).
+
+### What this does NOT show
+
+No network download, no mirror, no tenant namespace and no tenant request. The refusal cases in the cluster altered the manifest, not the files; changed, truncated and oversized files are covered by unit tests only. Digests prove the files are the pinned ones, not that the model is trustworthy. No signatures, and no scanning.
+
 ## Slurm sandbox
 
 A **single-node sandbox** to practise batch scheduling concepts. It is not an HPC cluster: `slurmctld`, `slurmd`, `slurmdbd` and MariaDB all run on the same WSL2 machine as k3s. Slurm 23.11.4, Apptainer 1.5.5 ([versions and accounting setup](results/slurm/versions.txt)). Set up with [`scripts/setup-slurm-wsl.sh`](scripts/setup-slurm-wsl.sh) (sudo); config in [`slurm/`](slurm/).
@@ -415,6 +435,9 @@ python mcp/eval/runner.py --out results/mcp-eval/my-run
 python mcp/eval/score.py sheet results/mcp-eval/my-run    # fill human_verdict, then: summary
 mcp/eval/env.sh down
 
+# Verified model fetch (file:// source; needs the llm-inference namespace and hf-cache)
+k8s/model-fetch/run-checks.sh && k8s/model-fetch/serve-check.sh
+
 # Checks (also run in CI)
 make test lint helm-validate
 ```
@@ -464,7 +487,7 @@ This lab is a single-user, single-node sketch; it does **not** implement any of 
 - **Authentication and authorisation:** an API gateway with OIDC/institutional SSO, per-tenant API keys and audit logs in front of the inference endpoints (vLLM is unauthenticated here).
 - **Multi-tenant observability:** per-tenant metric and log separation (for example tenant-labelled series and per-tenant dashboards/access control in the observability backend), retention and data-sovereignty controls. Here there is one Prometheus and one Grafana dashboard.
 - **LLM/MCP-based operations analysis:** the MCP server here is read-only with fixed queries and an audit log, which is the safe shape for this, but it has no authentication or tenant scoping and the 7B model's analysis was weak in the first run; the [later evaluation](#ai-operations-evaluation) is too small to claim reliability either way.
-- **Bring-your-own-model:** a vetted path for tenants to deploy their own weights (image scanning, size limits, resource profiles).
+- **Bring-your-own-model:** a vetted path for tenants to deploy their own weights. Only the [verification step](#verified-model-fetch) exists (size limit, format and digest checks); requests, image scanning and resource profiles do not.
 
 ## License
 
