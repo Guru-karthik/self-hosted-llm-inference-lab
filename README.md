@@ -479,6 +479,8 @@ Note: the Makefile targets were written from the commands I ran by hand. `make t
 
 ## How this maps to a sovereign multi-tenant platform
 
+A [design note on federation, multi-tenant observability and identity](docs/federation-and-tenant-observability.md) (design, not implemented) goes further into three of the points below.
+
 This lab is a single-user, single-node sketch; it does **not** implement any of the following. What a platform at scale would need on top:
 
 - **Federation:** multiple clusters (possibly across institutions) behind a common control plane and model catalogue, with placement that respects data-residency rules; this needs cluster-API/GitOps tooling and cross-cluster identity, none of which is here.
