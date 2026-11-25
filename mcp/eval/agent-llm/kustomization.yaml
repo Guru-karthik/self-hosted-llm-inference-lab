@@ -1,0 +1,16 @@
+# The agent's own model during the evaluation: tenant-a's vLLM (same image, model and
+# weights already in its PVC) with the tool-calling flags added. It is not the system
+# under test, so a fault in llm-inference does not take the agent's model away.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../k8s/tenants/overlays/tenant-a
+patches:
+  - target: {kind: Deployment, name: vllm}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --enable-auto-tool-choice
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --tool-call-parser=hermes
