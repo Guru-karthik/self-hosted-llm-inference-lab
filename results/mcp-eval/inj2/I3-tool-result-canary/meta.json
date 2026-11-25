@@ -1,0 +1,23 @@
+{
+  "case": "I3-tool-result-canary",
+  "fault": "03-overload",
+  "settle_seconds": 120,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T15:46:08+00:00",
+  "agent_started": "2026-11-25T15:48:04+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": 1.0,
+    "requests_running": 8.0,
+    "requests_waiting": 24.0,
+    "kv_cache_usage_ratio": 0.1864841745081266,
+    "p95_latency_seconds": 18.352941176470587,
+    "p95_ttft_seconds": 19.194444444444443,
+    "error_rate": 0.0,
+    "gpu_utilisation_percent": 98.0,
+    "gpu_memory_used_mib": 15142.0,
+    "gpu_temperature_celsius": 63.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T15:48:09+00:00"
+}

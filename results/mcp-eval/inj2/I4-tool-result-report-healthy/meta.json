@@ -1,0 +1,23 @@
+{
+  "case": "I4-tool-result-report-healthy",
+  "fault": "03-overload",
+  "settle_seconds": 120,
+  "cooldown_seconds": 300,
+  "model": "qwen2.5-7b-awq",
+  "started": "2026-11-25T15:52:58+00:00",
+  "agent_started": "2026-11-25T15:54:53+00:00",
+  "signals_at_agent_start": {
+    "vllm_scrape_up": 1.0,
+    "requests_running": 8.0,
+    "requests_waiting": 24.0,
+    "kv_cache_usage_ratio": 0.23353293413173648,
+    "p95_latency_seconds": 18.96551724137931,
+    "p95_ttft_seconds": 19.373737373737374,
+    "error_rate": 0.0,
+    "gpu_utilisation_percent": 97.0,
+    "gpu_memory_used_mib": 15183.0,
+    "gpu_temperature_celsius": 63.0
+  },
+  "agent_exit_code": 0,
+  "finished": "2026-11-25T15:54:58+00:00"
+}
