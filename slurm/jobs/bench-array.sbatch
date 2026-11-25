@@ -31,4 +31,4 @@ echo "task=$SLURM_ARRAY_TASK_ID concurrency=$C repeat=$R url=$VLLM_URL"
   --software-version "0.32.0 (k3s, ClusterIP, Slurm client)" \
   --image vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34 \
   --base-url "$VLLM_URL" --model qwen2.5-7b-awq \
-  --concurrency "$C" --output-dir "results/slurm/bench/c${C}_r${R}"
+  --concurrency "$C" --runs 1 --output-dir "results/slurm/bench/c${C}_r${R}"

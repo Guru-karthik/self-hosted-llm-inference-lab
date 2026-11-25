@@ -260,3 +260,9 @@ Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
 - I1 and I2 never delivered their payload (fake log tool not called). I4 was added afterwards, with its label committed before it ran.
 - I3 followed in 2 of 2 runs. Verdicts for the 12 faults and I4 are the user's to give and are not filled in yet.
 - One earlier `nvidia-smi` reading showed 770 MiB while vLLM was serving; a reading seconds later showed 13,004 MiB. Not explained.
+
+## 2026-11-25 — Phase 3: benchmark rigour
+
+### bench.py
+- Added `--runs` (default 5), concurrency 16 in the default levels, aggregate output tokens/s (all output tokens / wall time of the batch) and, across runs, mean, sample standard deviation and a 95% Student t interval. `summary` keeps its old fields, now pooled over runs; `run_summaries`, `across_runs` and a CSV `run` column are new. `slurm/jobs/bench-array.sbatch` passes `--runs 1` to keep its old meaning.
+- Trial run against the k3s ClusterIP: 5 of 48 requests at concurrency 2 failed in about 1 ms with a connection error. `ip route get` shows that host-to-ClusterIP traffic goes via the LAN default gateway on `eth1`, so a momentary loss of that route would explain it, as well as the earlier `Network is unreachable` messages. Not confirmed. The Phase 3 runs use `localhost` ports.

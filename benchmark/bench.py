@@ -8,6 +8,7 @@ import csv
 import json
 import math
 import platform
+import statistics
 import subprocess
 import sys
 import threading
@@ -34,6 +35,17 @@ CSV_FIELDS = [
     "tokens_per_second",
     "measurement_error",
     "error",
+    "run",
+]
+# Two-sided 95% Student t critical values for 1..30 degrees of freedom.
+T95 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
+       2.201, 2.179, 2.160, 2.145, 2.131, 2.120, 2.110, 2.101, 2.093, 2.086,
+       2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042]
+ACROSS_RUN_METRICS = [
+    "ttft_p50_seconds",
+    "tokens_per_second_p50",
+    "end_to_end_p50_seconds",
+    "aggregate_output_tokens_per_second",
 ]
 
 
@@ -141,6 +153,69 @@ def summarize_requests(
         ),
         "peak_vram_mib": peak_vram_mib,
     }
+
+
+def aggregate_throughput(records: list[dict[str, Any]], wall_seconds: float) -> float | None:
+    """Output tokens of all successful requests divided by the wall time of the batch.
+
+    None if no request succeeded or a successful one has no token count, because a
+    partial sum would understate the throughput.
+    """
+    successful = [record for record in records if record["success"]]
+    if not successful or wall_seconds <= 0:
+        return None
+    if any(record["completion_tokens"] is None for record in successful):
+        return None
+    return sum(record["completion_tokens"] for record in successful) / wall_seconds
+
+
+def across_runs(values: list[float | None]) -> dict[str, Any]:
+    """Mean, sample standard deviation and 95% t confidence interval over runs."""
+    present = [value for value in values if value is not None]
+    result: dict[str, Any] = {"n": len(present), "mean": None, "std": None,
+                              "ci95_low": None, "ci95_high": None}
+    if not present:
+        return result
+    result["mean"] = statistics.fmean(present)
+    if len(present) < 2:
+        return result
+    result["std"] = statistics.stdev(present)
+    degrees = len(present) - 1
+    critical = T95[degrees - 1] if degrees <= len(T95) else 1.96
+    half_width = critical * result["std"] / math.sqrt(len(present))
+    result["ci95_low"] = result["mean"] - half_width
+    result["ci95_high"] = result["mean"] + half_width
+    return result
+
+
+def summarize_level(
+    run_records: list[list[dict[str, Any]]],
+    wall_seconds: list[float],
+    peak_vram_mib: list[int],
+    concurrency: int,
+) -> dict[str, Any]:
+    """Summary of one concurrency level: pooled requests plus statistics across runs."""
+    run_summaries = []
+    for index, (records, wall, peak) in enumerate(
+        zip(run_records, wall_seconds, peak_vram_mib), start=1
+    ):
+        run_summary = summarize_requests(records, concurrency, peak)
+        run_summary["run"] = index
+        run_summary["wall_seconds"] = wall
+        run_summary["aggregate_output_tokens_per_second"] = aggregate_throughput(records, wall)
+        run_summaries.append(run_summary)
+    pooled = summarize_requests(
+        [record for records in run_records for record in records],
+        concurrency,
+        max(peak_vram_mib),
+    )
+    pooled["runs"] = len(run_records)
+    pooled["across_runs"] = {
+        metric: across_runs([run[metric] for run in run_summaries])
+        for metric in ACROSS_RUN_METRICS
+    }
+    pooled["run_summaries"] = run_summaries
+    return pooled
 
 
 def gpu_info() -> list[dict[str, str]]:
@@ -348,35 +423,40 @@ def run_benchmark(args: argparse.Namespace) -> tuple[Path, Path]:
     next_request_id = 1
     for concurrency in args.concurrency:
         request_count = len(prompts) * args.repeats
-        scheduled = [
-            (next_request_id + index, prompts[index % len(prompts)])
-            for index in range(request_count)
-        ]
-        next_request_id += request_count
-        sampler = GpuMemorySampler()
-        sampler.start()
-        try:
-            with ThreadPoolExecutor(max_workers=concurrency) as executor:
-                futures = [
-                    executor.submit(
-                        request_once,
-                        request_id=request_id,
-                        concurrency=concurrency,
-                        prompt=prompt,
-                        base_url=args.base_url,
-                        model=args.model,
-                        max_tokens=args.max_tokens,
-                        timeout_seconds=args.timeout,
-                    )
-                    for request_id, prompt in scheduled
-                ]
-                records = [future.result() for future in futures]
-        finally:
-            peak_vram_mib = sampler.stop()
-        all_records.extend(records)
-        summaries.append(
-            summarize_requests(records, concurrency, peak_vram_mib)
-        )
+        run_records, wall_seconds, peaks = [], [], []
+        for run in range(1, args.runs + 1):
+            scheduled = [
+                (next_request_id + index, prompts[index % len(prompts)])
+                for index in range(request_count)
+            ]
+            next_request_id += request_count
+            sampler = GpuMemorySampler()
+            sampler.start()
+            try:
+                started = time.monotonic()
+                with ThreadPoolExecutor(max_workers=concurrency) as executor:
+                    futures = [
+                        executor.submit(
+                            request_once,
+                            request_id=request_id,
+                            concurrency=concurrency,
+                            prompt=prompt,
+                            base_url=args.base_url,
+                            model=args.model,
+                            max_tokens=args.max_tokens,
+                            timeout_seconds=args.timeout,
+                        )
+                        for request_id, prompt in scheduled
+                    ]
+                    records = [future.result() for future in futures]
+                wall_seconds.append(time.monotonic() - started)
+            finally:
+                peaks.append(sampler.stop())
+            for record in records:
+                record["run"] = run
+            run_records.append(records)
+            all_records.extend(records)
+        summaries.append(summarize_level(run_records, wall_seconds, peaks, concurrency))
 
     run_id = f"{args.engine}_{run_started_at.strftime('%Y%m%dT%H%M%S.%fZ')}"
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -395,6 +475,7 @@ def run_benchmark(args: argparse.Namespace) -> tuple[Path, Path]:
         "settings": {
             "concurrency_levels": args.concurrency,
             "repeats_per_prompt": args.repeats,
+            "runs": args.runs,
             "prompt_count": len(prompts),
             "max_tokens": args.max_tokens,
             "timeout_seconds": args.timeout,
@@ -420,15 +501,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("results"))
-    parser.add_argument("--concurrency", type=int, nargs="+", default=[1, 2, 4, 8])
+    parser.add_argument("--concurrency", type=int, nargs="+", default=[1, 2, 4, 8, 16])
     parser.add_argument("--repeats", type=int, default=2)
+    parser.add_argument("--runs", type=int, default=5,
+                        help="times each concurrency level is repeated, for mean and CI")
     parser.add_argument("--max-tokens", type=int, default=64)
     parser.add_argument("--timeout", type=float, default=300)
     args = parser.parse_args()
     if any(value < 1 for value in args.concurrency):
         parser.error("concurrency values must be positive integers")
-    if args.repeats < 1 or args.max_tokens < 1 or args.timeout <= 0:
-        parser.error("repeats, max-tokens, and timeout must be positive")
+    if args.repeats < 1 or args.runs < 1 or args.max_tokens < 1 or args.timeout <= 0:
+        parser.error("repeats, runs, max-tokens, and timeout must be positive")
     return args
 
 

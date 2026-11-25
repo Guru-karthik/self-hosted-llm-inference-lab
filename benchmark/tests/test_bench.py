@@ -1,9 +1,12 @@
 import pytest
 
 from benchmark.bench import (
+    across_runs,
+    aggregate_throughput,
     consume_stream,
     nearest_rank_percentile,
     parse_sse_data,
+    summarize_level,
     summarize_requests,
 )
 
@@ -94,3 +97,52 @@ def test_summary_reports_failures_and_successful_latency_statistics():
     assert summary["tokens_per_second_p50"] == 10.0
     assert summary["token_count_unavailable_count"] == 1
     assert summary["peak_vram_mib"] == 9000
+
+
+def _record(ttft, e2e, tokens, success=True):
+    return {
+        "success": success,
+        "ttft_seconds": ttft,
+        "end_to_end_seconds": e2e,
+        "completion_tokens": tokens,
+        "tokens_per_second": 100.0 if success else None,
+    }
+
+
+def test_across_runs_uses_sample_std_and_t_interval():
+    result = across_runs([1.0, 2.0, 3.0, 4.0, 5.0])
+
+    assert result["n"] == 5
+    assert result["mean"] == pytest.approx(3.0)
+    assert result["std"] == pytest.approx(1.5811388)
+    # t(0.975, df=4) = 2.776; half width = 2.776 * 1.5811388 / sqrt(5)
+    assert result["ci95_high"] - result["mean"] == pytest.approx(1.962918, rel=1e-5)
+    assert result["mean"] - result["ci95_low"] == pytest.approx(1.962918, rel=1e-5)
+
+
+def test_across_runs_gives_no_interval_for_a_single_run():
+    result = across_runs([2.0, None])
+
+    assert result["n"] == 1
+    assert result["mean"] == 2.0
+    assert result["std"] is None and result["ci95_low"] is None
+    assert across_runs([])["mean"] is None
+
+
+def test_aggregate_throughput_counts_successful_tokens_over_wall_time():
+    records = [_record(0.1, 1.0, 60), _record(0.1, 1.0, 40), _record(None, 0.1, None, False)]
+
+    assert aggregate_throughput(records, 4.0) == pytest.approx(25.0)
+    assert aggregate_throughput(records + [_record(0.1, 1.0, None)], 4.0) is None
+
+
+def test_summarize_level_pools_requests_and_compares_runs():
+    runs = [[_record(0.1, 1.0, 10)], [_record(0.3, 3.0, 10)]]
+
+    summary = summarize_level(runs, wall_seconds=[1.0, 2.0], peak_vram_mib=[100, 120], concurrency=4)
+
+    assert summary["request_count"] == 2 and summary["runs"] == 2
+    assert summary["peak_vram_mib"] == 120
+    assert summary["across_runs"]["ttft_p50_seconds"]["mean"] == pytest.approx(0.2)
+    assert summary["across_runs"]["aggregate_output_tokens_per_second"]["mean"] == pytest.approx(7.5)
+    assert [run["run"] for run in summary["run_summaries"]] == [1, 2]
