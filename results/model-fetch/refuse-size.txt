@@ -1,0 +1,3 @@
+# job refuse-size, 2026-11-25T17:35:32+01:00, condition: FailureTarget Failed, wall: 2 s
+REFUSED: model is 5582398839 bytes, over the limit of 1000000000
+Qwen/Qwen2.5-7B-Instruct-AWQ @ b25037543e9394b818fdfca67ab2a00ecc7dd641 from file:///source/hub/models--Qwen--Qwen2.5-7B-Instruct-AWQ/snapshots/b25037543e9394b818fdfca67ab2a00ecc7dd641/
