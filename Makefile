@@ -14,6 +14,7 @@ test:
 	$(PY) -m pytest -q benchmark/tests
 	$(PY) -m pytest -q mcp/tests
 	$(PY) -m pytest -q mcp/eval/tests
+	$(PY) -m pytest -q k8s/model-fetch/tests
 
 lint:
 	yamllint .

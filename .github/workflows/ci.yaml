@@ -32,6 +32,7 @@ jobs:
           python -m pytest -q benchmark/tests
           python -m pytest -q mcp/tests
           python -m pytest -q mcp/eval/tests
+          python -m pytest -q k8s/model-fetch/tests
 
       - uses: azure/setup-helm@v5.0.1
 
