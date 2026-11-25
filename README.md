@@ -4,6 +4,8 @@ A small, measured study of serving an open-weight LLM on a single consumer GPU: 
 
 This is a learning/portfolio project for AI-infrastructure platform engineering. It is **not** a production platform, and the [limitations](#limitations) and [what I did not do](#what-i-did-not-do) sections are part of the result.
 
+A shorter read: the [technical report](docs/report.md) (question, method, results with confidence intervals, threats to validity and a reference architecture sketch).
+
 ## What is in the repo
 
 | Path | Contents |
