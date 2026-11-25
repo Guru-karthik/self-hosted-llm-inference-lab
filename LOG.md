@@ -237,3 +237,14 @@ Sandbox only, on the same WSL2 machine as k3s (Europe/Berlin offset +01:00 in th
 
 ### Left on the machine
 Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
+
+## 2026-11-25 — Phase E: AI-operations evaluation
+
+### Labels
+- `mcp/eval/faults.yaml` was drafted by Claude Code and committed before any agent run (`839021f`). The user was asked to review it and replied "ok" without edits.
+
+### Smoke test of the injections (no agent)
+- First version of `loadgen.py` was wrong: it called `iter_lines()` once per line, so every request was cut off after one line and no request ever completed. Seen because e2e latency and error rate were empty in every case. Fixed, with a test. Smoke run restarted.
+- Client disconnects (after 5 or 100 streamed lines) did not change any `vllm:request_success_total` counter on vLLM 0.32.0 although tokens were generated (`results/mcp-eval/smoke/abort_check.txt`). Fault 06 is therefore marked `observable: false`; its label was not changed.
+- `loadgen.py` occasionally logs `ConnectError: [Errno 101] Network is unreachable` against the ClusterIP; other requests succeed. Not diagnosed.
+- A `kubectl wait/delete -l app=vllm` also matched 16 dead pods from earlier restarts; limited to running pods.

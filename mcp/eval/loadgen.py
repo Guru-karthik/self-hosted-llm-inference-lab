@@ -6,7 +6,6 @@ records nothing and only exists to push the target vLLM into a chosen state.
 from __future__ import annotations
 
 import argparse
-import itertools
 import random
 import threading
 import time
@@ -27,18 +26,30 @@ def build_body(model: str, prompt_words: int, max_tokens: int, ignore_eos: bool)
     return body
 
 
+def consume(lines, abort_after: int = 0) -> int:
+    """Read a streamed response; stop early after abort_after non-empty lines (0 = never).
+
+    The line iterator must be created once per response: httpx streams can only be read
+    once.
+    """
+    count = 0
+    for line in lines:
+        count += bool(line)
+        if abort_after and count >= abort_after:
+            break
+    return count
+
+
 def worker(args) -> None:
     while True:
         try:
             with httpx.stream("POST", f"{args.url}/chat/completions", timeout=600,
                               json=build_body(args.model, args.prompt_words, args.max_tokens,
                                               args.ignore_eos)) as response:
-                for count in itertools.count(1):
-                    if next(response.iter_lines(), None) is None:
-                        break
-                    if args.abort_after and count >= args.abort_after:
-                        break
-        except (httpx.HTTPError, RuntimeError, StopIteration):
+                response.raise_for_status()
+                consume(response.iter_lines(), args.abort_after)
+        except httpx.HTTPError as error:
+            print(f"{type(error).__name__}: {error}", flush=True)
             time.sleep(1)
         time.sleep(args.pause)
 

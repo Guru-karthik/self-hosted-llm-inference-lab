@@ -48,6 +48,10 @@ faults:
   - id: 06-client-aborts
     injection: clients disconnect after the first tokens of each response
     settle_seconds: 90
+    # Added 2026-11-25 after the smoke test and before any agent run (label unchanged):
+    # vLLM 0.32.0 did not count client disconnects in request_success_total at all, so
+    # the error-rate tool cannot see this fault (results/mcp-eval/smoke/abort_check.txt).
+    observable: false
     expected: An elevated share of requests end in abort/error; the service itself is up.
     correct_if: Reports the elevated error or abort rate as the problem.
     partial_if: Mentions the error rate but concludes healthy with no concern.

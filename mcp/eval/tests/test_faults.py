@@ -7,7 +7,7 @@ import yaml
 EVAL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(EVAL))
 
-from loadgen import build_body  # noqa: E402
+from loadgen import build_body, consume  # noqa: E402
 
 LABELS = yaml.safe_load((EVAL / "faults.yaml").read_text())
 
@@ -32,3 +32,11 @@ def test_long_prompt_and_ignore_eos():
     body = build_body("m", 2800, 600, True)
     assert body["messages"][0]["content"].split().count("alpha") == 2800
     assert body["ignore_eos"] is True and body["max_tokens"] == 600
+
+
+def test_consume_reads_the_whole_stream_unless_told_to_abort():
+    stream = iter(["data: a", "", "data: b", "", "data: c", "", "data: [DONE]"])
+    assert consume(stream) == 4
+    rest = iter(["data: a", "", "data: b", "", "data: c"])
+    assert consume(rest, abort_after=2) == 2
+    assert list(rest) == ["", "data: c"]

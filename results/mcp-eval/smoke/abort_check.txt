@@ -1,0 +1,14 @@
+# Do client disconnects show up in vLLM 0.32.0's abort counter? 2026-11-25T14:01:17+01:00
+## before
+vllm:generation_tokens_total 6617.0
+vllm:request_success_total length 84.0
+vllm:request_success_total abort 0.0
+vllm:request_success_total error 0.0
+## 25 s: loadgen --concurrency 4 --max-tokens 512 --ignore-eos --abort-after 100
+ConnectError: [Errno 101] Network is unreachable
+ConnectError: [Errno 101] Network is unreachable
+## after
+vllm:generation_tokens_total 19677.0
+vllm:request_success_total length 84.0
+vllm:request_success_total abort 0.0
+vllm:request_success_total error 0.0
