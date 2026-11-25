@@ -411,10 +411,12 @@ make docker-vllm   # wait until http://localhost:8000/v1/models responds, then:
 make bench-vllm
 
 # Repeated runs (stop other GPU users first; needs the Slurm sandbox, or run
-# `python -m benchmark.bench ... --runs 5` directly). Tuned Ollama:
+# `python -m benchmark.bench ... --runs 5` directly). Tuned Ollama, into a NEW folder so
+# that the committed results (which the README tables are generated from) stay as they are:
+mkdir -p results/phase3/my-ollama-tuned
 docker compose -f docker/compose.yaml -f docker/compose.ollama-tuned.yaml --profile ollama up -d ollama
-sbatch --export=ALL,NAME=ollama-tuned,ENGINE=ollama,VERSION=0.40.13,IMAGE=ollama/ollama@sha256:b2f0...,URL=http://localhost:11435/v1,MODEL=qwen2.5:7b-instruct-q4_K_M slurm/jobs/bench-engine.sbatch
-python scripts/render-results.py          # regenerate the README tables
+sbatch --export=ALL,NAME=my-ollama-tuned,ENGINE=ollama,VERSION=0.40.13,IMAGE=ollama/ollama@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429,URL=http://localhost:11435/v1,MODEL=qwen2.5:7b-instruct-q4_K_M slurm/jobs/bench-engine.sbatch
+python scripts/render-results.py          # regenerate the tables from the committed results
 
 # Phase 2
 ./scripts/setup-k3s-wsl.sh        # NVIDIA toolkit, k3s, Helm
@@ -494,7 +496,7 @@ Note: the Makefile targets were written from the commands I ran by hand. `make t
 
 A [design note on federation, multi-tenant observability and identity](docs/federation-and-tenant-observability.md) (design, not implemented) goes further into three of the points below.
 
-This lab is a single-user, single-node sketch; it does **not** implement any of the following. What a platform at scale would need on top:
+This lab is a single-user, single-node sketch; it implements **none of the following in full**, and some not at all. What a platform at scale would need on top:
 
 - **Federation:** multiple clusters (possibly across institutions) behind a common control plane and model catalogue, with placement that respects data-residency rules; this needs cluster-API/GitOps tooling and cross-cluster identity, none of which is here.
 - **Tenant isolation:** namespaces, quotas, NetworkPolicies, per-tenant RBAC and storage are shown [above](#two-tenants-on-one-gpu) for two tenants on one node; real isolation also needs separate or MIG/vGPU-partitioned GPUs (time-slicing does not isolate GPU memory), node-level separation, secrets management and pod security enforcement.
