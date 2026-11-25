@@ -1,0 +1,11 @@
+# Per-tenant model cache. PVCs cannot be shared across namespaces, so each tenant holds
+# its own copy of the weights (load-weights.sh).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hf-cache
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi

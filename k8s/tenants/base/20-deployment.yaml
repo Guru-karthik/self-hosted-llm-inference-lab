@@ -1,0 +1,73 @@
+# One tenant's vLLM, based on k8s/vllm/20-deployment.yaml with the GPU-sharing setting
+# from k8s/sharing/: a fixed KV cache, because vLLM counts the other pod's GPU memory
+# against --gpu-memory-utilization. No tool-calling flags.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  labels:
+    app: vllm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      runtimeClassName: nvidia
+      enableServiceLinks: false
+      # The model server never calls the Kubernetes API.
+      automountServiceAccountToken: false
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
+          args:
+            - --model=Qwen/Qwen2.5-7B-Instruct-AWQ
+            - --served-model-name=qwen2.5-7b-awq
+            - --quantization=awq
+            - --max-model-len=4096
+            - --kv-cache-memory-bytes=1073741824
+            - --max-num-seqs=8
+          env:
+            - name: HF_HUB_OFFLINE
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8000
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /root/.cache/huggingface
+            - name: shm
+              mountPath: /dev/shm
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 180
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 30
+            failureThreshold: 5
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: hf-cache
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi

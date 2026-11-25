@@ -1,0 +1,7 @@
+# Namespace for tenant-a.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a
+  labels:
+    lab/tenant: tenant-a

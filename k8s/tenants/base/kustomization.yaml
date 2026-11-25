@@ -1,0 +1,9 @@
+# Everything one tenant gets. Each overlay sets the namespace and adds the Namespace object.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-resourcequota.yaml
+  - 01-limitrange.yaml
+  - 10-pvc.yaml
+  - 20-deployment.yaml
+  - 30-service.yaml

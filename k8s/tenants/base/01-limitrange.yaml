@@ -1,0 +1,12 @@
+# Defaults for containers that declare no resources (the quota would otherwise reject
+# them) and a per-container ceiling.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-limits
+spec:
+  limits:
+    - type: Container
+      defaultRequest: {cpu: 100m, memory: 128Mi}
+      default: {cpu: 500m, memory: 256Mi}
+      max: {cpu: "4", memory: 8Gi}

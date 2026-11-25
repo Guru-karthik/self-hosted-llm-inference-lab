@@ -1,0 +1,15 @@
+# Caps what one tenant can request. requests.nvidia.com/gpu counts time-sliced units,
+# not GPU memory or compute share.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+spec:
+  hard:
+    requests.nvidia.com/gpu: "1"
+    requests.cpu: "4"
+    requests.memory: 6Gi
+    limits.memory: 10Gi
+    persistentvolumeclaims: "1"
+    requests.storage: 20Gi
+    pods: "5"
