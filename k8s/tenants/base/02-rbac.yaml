@@ -1,0 +1,33 @@
+# Identity a tenant user would use: read their own workloads, nothing else. No secrets,
+# no writes, no cluster-scoped access. A Role (not ClusterRole) stops at the namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-user
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tenant-view
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tenant-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tenant-view
+# kustomize rewrites the subject namespace to the overlay's namespace.
+subjects:
+  - kind: ServiceAccount
+    name: tenant-user
+    namespace: default

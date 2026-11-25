@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - 00-resourcequota.yaml
   - 01-limitrange.yaml
+  - 02-rbac.yaml
   - 10-pvc.yaml
   - 20-deployment.yaml
   - 30-service.yaml
