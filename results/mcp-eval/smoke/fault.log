@@ -1,0 +1,53 @@
+$ 01-healthy-idle.sh inject  (2026-11-25T12:40:45+00:00)
+$ 01-healthy-idle.sh restore  (2026-11-25T12:40:45+00:00)
+$ 02-healthy-light-load.sh inject  (2026-11-25T12:41:44+00:00)
+$ 02-healthy-light-load.sh restore  (2026-11-25T12:43:12+00:00)
+$ 03-overload.sh inject  (2026-11-25T12:44:11+00:00)
+$ 03-overload.sh restore  (2026-11-25T12:46:09+00:00)
+$ 04-kv-cache-pressure.sh inject  (2026-11-25T12:47:07+00:00)
+$ 04-kv-cache-pressure.sh restore  (2026-11-25T12:49:05+00:00)
+$ 05-long-outputs.sh inject  (2026-11-25T12:50:03+00:00)
+$ 05-long-outputs.sh restore  (2026-11-25T12:52:30+00:00)
+$ 06-client-aborts.sh inject  (2026-11-25T12:53:29+00:00)
+$ 06-client-aborts.sh restore  (2026-11-25T12:54:57+00:00)
+$ 07-scaled-to-zero.sh inject  (2026-11-25T12:55:55+00:00)
+deployment.apps/vllm scaled
+$ 07-scaled-to-zero.sh restore  (2026-11-25T12:57:23+00:00)
+deployment.apps/vllm scaled
+Waiting for deployment "vllm" rollout to finish: 0 of 1 updated replicas are available...
+$ 02-healthy-light-load.sh inject  (2026-11-25T13:02:52+00:00)
+$ 02-healthy-light-load.sh restore  (2026-11-25T13:04:20+00:00)
+$ 03-overload.sh inject  (2026-11-25T13:05:04+00:00)
+$ 03-overload.sh restore  (2026-11-25T13:07:01+00:00)
+$ 04-kv-cache-pressure.sh inject  (2026-11-25T13:07:44+00:00)
+$ 04-kv-cache-pressure.sh restore  (2026-11-25T13:09:42+00:00)
+$ 05-long-outputs.sh inject  (2026-11-25T13:10:25+00:00)
+$ 05-long-outputs.sh restore  (2026-11-25T13:12:52+00:00)
+$ 08-pod-restarting.sh inject  (2026-11-25T13:13:35+00:00)
+pod "vllm-c57fc496f-bqdsw" deleted from llm-inference namespace
+$ 08-pod-restarting.sh restore  (2026-11-25T13:14:05+00:00)
+Waiting for deployment "vllm" rollout to finish: 0 of 1 updated replicas are available...
+deployment "vllm" successfully rolled out
+$ 09-crash-loop.sh inject  (2026-11-25T13:16:43+00:00)
+deployment.apps/vllm patched
+$ 09-crash-loop.sh restore  (2026-11-25T13:18:40+00:00)
+deployment.apps/vllm patched
+Waiting for deployment "vllm" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "vllm" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "vllm" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "vllm" rollout to finish: 0 of 1 updated replicas are available...
+deployment "vllm" successfully rolled out
+$ 10-gpu-metrics-missing.sh inject  (2026-11-25T13:22:36+00:00)
+daemonset.apps/dcgm-dcgm-exporter patched
+$ 10-gpu-metrics-missing.sh restore  (2026-11-25T13:24:04+00:00)
+daemonset.apps/dcgm-dcgm-exporter patched
+Waiting for daemon set "dcgm-dcgm-exporter" rollout to finish: 0 of 1 updated pods are available...
+daemon set "dcgm-dcgm-exporter" successfully rolled out
+$ 11-wrong-scrape-path.sh inject  (2026-11-25T13:25:40+00:00)
+servicemonitor.monitoring.coreos.com/vllm patched
+$ 11-wrong-scrape-path.sh restore  (2026-11-25T13:27:08+00:00)
+servicemonitor.monitoring.coreos.com/vllm configured
+$ 12-netpol-blocks-prometheus.sh inject  (2026-11-25T13:28:41+00:00)
+networkpolicy.networking.k8s.io/eval-deny-ingress created
+$ 12-netpol-blocks-prometheus.sh restore  (2026-11-25T13:30:08+00:00)
+networkpolicy.networking.k8s.io "eval-deny-ingress" deleted from llm-inference namespace
