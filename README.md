@@ -1,6 +1,6 @@
 # Self-hosted LLM inference lab
 
-A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Everything here was run on one machine, on 2026-10-29 except the [Slurm sandbox](#slurm-sandbox) (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
+A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Everything here was run on one machine, on 2026-10-29 except the [two-tenant isolation](#two-tenants-on-one-gpu) and [Slurm sandbox](#slurm-sandbox) work (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
 
 This is a learning/portfolio project for AI-infrastructure platform engineering. It is **not** a production platform, and the [limitations](#limitations) and [what I did not do](#what-i-did-not-do) sections are part of the result.
 
@@ -10,12 +10,13 @@ This is a learning/portfolio project for AI-infrastructure platform engineering.
 |---|---|
 | `docker/compose.yaml`, `scripts/start-runtime.sh` | Digest-pinned Ollama and vLLM services; the script runs one engine at a time on the GPU |
 | `benchmark/` | Python benchmark client (OpenAI-compatible streaming API) and pytest tests for parsing and statistics |
-| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/`, `slurm/` |
+| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/`, `slurm/`, `isolation/` |
 | `k8s/vllm/` | Namespace + ResourceQuota, model-cache PVC, vLLM Deployment, Service |
 | `k8s/monitoring/` | Helm values for kube-prometheus-stack and the DCGM exporter, vLLM ServiceMonitor, dashboard ConfigMap |
 | `dashboards/` | Grafana dashboard JSON (11 panels) |
 | `scripts/setup-k3s-wsl.sh` | Host setup (NVIDIA container toolkit, k3s, Helm); needs sudo, read before running |
 | `k8s/sharing/` | GPU time-slicing experiment (device-plugin config, two vLLM pods, quota override) |
+| `k8s/tenants/`, `k8s/tests/isolation-test.sh` | Two tenant namespaces (kustomize base and overlays), weight loader, automated isolation test |
 | `mcp/` | Read-only Prometheus MCP server, tool-calling agent, tests |
 | `slurm/`, `scripts/setup-slurm-wsl.sh` | Single-node Slurm sandbox: config, scheduling demos, job scripts, Apptainer test; setup needs sudo |
 | `docs/` | Write-ups: a pod download problem, and a [design note on Slurm and Kubernetes sharing GPUs](docs/slurm-vs-kubernetes.md) |
@@ -182,6 +183,35 @@ What this does and does not show:
 
 Prometheus scrapes vLLM's `/metrics` (a ServiceMonitor) and the DCGM exporter. The dashboard ([`dashboards/llm-inference.json`](dashboards/llm-inference.json)) has panels for e2e latency, TTFT, inter-token latency, tokens/s, requests/s, running vs waiting requests, KV-cache usage, and GPU utilisation, memory, temperature and power. I verified the dashboard loaded into Grafana and that each panel's query returned data after a load run; I did not capture screenshots.
 
+## Two tenants on one GPU
+
+[`k8s/tenants/`](k8s/tenants/) creates `tenant-a` and `tenant-b` from one kustomize base: own vLLM Deployment, Service and model-cache PVC, ResourceQuota, LimitRange, a read-only ServiceAccount with Role and RoleBinding, NetworkPolicies and a ServiceMonitor. The two servers share the one GPU through the same time-slicing configuration (2 units) and fixed 1 GiB KV cache as the [earlier experiment](#gpu-sharing-with-time-slicing).
+
+**Network policy enforcement.** This k3s uses flannel (VXLAN) with the network-policy controller built into k3s, kube-router based ([raw](results/isolation/cni.txt)). Policies **were enforced**: with them removed, a pod in `tenant-a` got HTTP 200 from `tenant-b`; with them applied, the same request got `Connection refused`.
+
+[`k8s/tests/isolation-test.sh`](k8s/tests/isolation-test.sh) ran 20 checks, all passing in the final run ([raw output](results/isolation/isolation-test.txt)):
+
+- **Network:** tenant to tenant blocked both ways, and from a namespace with no policies of its own; the labelled test-client namespace reaches both; Prometheus still scrapes both; a tenant pod cannot open a connection to the API server.
+- **API access:** with `tenant-a`'s ServiceAccount token, listing its own pods returns 200; `tenant-b` pods and secrets, its own secrets, and nodes return 403.
+- **Quota:** a second GPU unit, an over-quota memory request and an extra PVC are each rejected with `exceeded quota`.
+
+| Resource | Isolated? | By what / why not |
+|---|---|---|
+| Pod network (tenant to tenant) | Yes, tested | Default-deny NetworkPolicy plus explicit allows |
+| Kubernetes API access | Yes, tested | Namespaced Role; no secrets, no writes |
+| CPU, memory, storage, GPU unit count | Capped, tested for memory, storage and GPU units | ResourceQuota and LimitRange (CPU quota set, not tested) |
+| **GPU memory** | **No** | Each tenant sees all 16,303 MiB and the combined use (14,494 to 14,496 MiB at the time) ([raw](results/isolation/gpu-sharing.txt)); one can exhaust it for both |
+| **GPU compute fairness** | **No** | Time-slicing gives no guaranteed share (see the measured slowdown above) |
+| **Node resources** (kernel, disk I/O, page cache, `/dev/shm` host RAM) | **No** | One node, shared |
+| **Traffic from the node itself** | **No** | The node got HTTP 200 from a tenant Service; `kubectl port-forward`, admins and host processes such as Slurm jobs are outside these policies |
+| **HTTP paths** | **No** | NetworkPolicy is address and port only: Prometheus is allowed all of port 8000, not just `/metrics` |
+
+Both servers answered a chat completion; engine initialisation took 90.48 s and 89.48 s, each with an 18,720-token KV cache. They were started one after the other. The experiment was then reverted (one GPU unit, original vLLM restored); tenant namespaces and their weight copies remain, scaled to 0.
+
+### What this does NOT show
+
+Not a secure multi-tenant platform. The vLLM API has no authentication or TLS; tenants are two namespaces operated by one admin. The test shows these specific requests being blocked or rejected on one node at one time, not that no path exists: there was no attempt to escape a container, attack through the GPU driver, or exhaust shared resources. The RBAC identity is a ServiceAccount token, not a person from an identity provider. Pod Security admission, per-tenant secrets encryption, egress control beyond default deny, and per-tenant dashboards or metric access control were not done: Prometheus is shared and unrestricted. Performance with both tenants loaded was not re-measured here.
+
 ## Slurm sandbox
 
 A **single-node sandbox** to practise batch scheduling concepts. It is not an HPC cluster: `slurmctld`, `slurmd`, `slurmdbd` and MariaDB all run on the same WSL2 machine as k3s. Slurm 23.11.4, Apptainer 1.5.5 ([versions and accounting setup](results/slurm/versions.txt)). Set up with [`scripts/setup-slurm-wsl.sh`](scripts/setup-slurm-wsl.sh) (sudo); config in [`slurm/`](slurm/).
@@ -263,6 +293,14 @@ kubectl -n llm-inference port-forward svc/vllm 8001:8000 &
 kubectl -n monitoring port-forward svc/kps-kube-prometheus-stack-prometheus 9090:9090 &
 python mcp/agent.py --llm-url http://localhost:8001/v1 --model qwen2.5-7b-awq --prometheus-url http://localhost:9090
 
+# Two tenants (after Phase 2). Enable time-slicing and stop the single-tenant vLLM first;
+# see LOG.md. Weights come from a local directory holding hub/ (no verification).
+k8s/tenants/load-weights.sh tenant-a /path/to/hf-home
+k8s/tenants/load-weights.sh tenant-b /path/to/hf-home
+kubectl -n tenant-a scale deploy/vllm --replicas=1   # wait until Ready, then tenant-b
+kubectl -n tenant-b scale deploy/vllm --replicas=1
+k8s/tests/isolation-test.sh
+
 # Slurm sandbox (changes the host, needs sudo; read the script first)
 ./scripts/setup-slurm-wsl.sh
 ./slurm/demo-fairshare.sh && ./slurm/demo-gpu.sh
@@ -304,7 +342,7 @@ Note: the Makefile targets were written from the commands I ran by hand. `make t
 - I did not diagnose why pods could not download from Hugging Face ([`docs/pod-network-download-issue.md`](docs/pod-network-download-issue.md)). The weights were copied from the Docker volume into the PVC and vLLM runs with `HF_HUB_OFFLINE=1`, so a network cold start in the cluster was never measured.
 - I did not investigate Ollama's concurrency behaviour or tune it.
 - I did not compare the same quantisation format across engines, or measure output quality.
-- No multi-node, multi-GPU, multi-tenant, authentication, TLS, autoscaling or alerting setup (Alertmanager is disabled).
+- No multi-node, multi-GPU, authentication, TLS, autoscaling or alerting setup (Alertmanager is disabled). Multi-tenancy only in the limited form [above](#two-tenants-on-one-gpu).
 - No screenshots of the dashboard.
 - Did not run the Docker or Kubernetes `make` targets locally (`make` was not installed at the time of those runs); the underlying commands were run individually.
 
@@ -313,7 +351,7 @@ Note: the Makefile targets were written from the commands I ran by hand. `make t
 This lab is a single-user, single-node sketch; it does **not** implement any of the following. What a platform at scale would need on top:
 
 - **Federation:** multiple clusters (possibly across institutions) behind a common control plane and model catalogue, with placement that respects data-residency rules; this needs cluster-API/GitOps tooling and cross-cluster identity, none of which is here.
-- **Tenant isolation:** namespaces with ResourceQuota (used here, for one namespace) are the starting point; real isolation also needs NetworkPolicies, RBAC per tenant, separate or MIG/vGPU-partitioned GPUs (time-slicing does not isolate GPU memory), per-tenant storage and secrets.
+- **Tenant isolation:** namespaces, quotas, NetworkPolicies, per-tenant RBAC and storage are shown [above](#two-tenants-on-one-gpu) for two tenants on one node; real isolation also needs separate or MIG/vGPU-partitioned GPUs (time-slicing does not isolate GPU memory), node-level separation, secrets management and pod security enforcement.
 - **Quotas and fair use:** per-tenant GPU/token budgets, admission control and queueing, plus scale-to-zero and weight caching to use scarce GPUs efficiently (the PVC cache here is a minimal version of that idea; its effect was measured only as warm-start vs a slow Docker download, and scale-to-zero here is manual).
 - **Authentication and authorisation:** an API gateway with OIDC/institutional SSO, per-tenant API keys and audit logs in front of the inference endpoints (vLLM is unauthenticated here).
 - **Multi-tenant observability:** per-tenant metric and log separation (for example tenant-labelled series and per-tenant dashboards/access control in the observability backend), retention and data-sovereignty controls. Here there is one Prometheus and one Grafana dashboard.

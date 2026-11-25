@@ -7,7 +7,8 @@ NVDP_VERSION := 0.20.1
 PY ?= python3
 
 .PHONY: test lint helm-validate docker-ollama docker-vllm bench-ollama bench-vllm \
-        k8s-gpu-plugin k8s-vllm k8s-monitoring k8s-dashboard bench-k8s grafana-password
+        k8s-gpu-plugin k8s-vllm k8s-monitoring k8s-dashboard bench-k8s grafana-password \
+        k8s-timeslicing k8s-single-gpu k8s-tenants isolation-test
 
 test:
 	$(PY) -m pytest -q benchmark/tests
@@ -85,3 +86,20 @@ bench-k8s:
 
 grafana-password:
 	@kubectl -n monitoring get secret kps-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+
+# --- Two tenants (see README "Two tenants on one GPU") ---
+k8s-timeslicing:
+	helm upgrade nvdp nvdp/nvidia-device-plugin -n nvidia-device-plugin --version $(NVDP_VERSION) \
+	  --reset-values -f k8s/sharing/device-plugin-timeslicing-values.yaml
+
+k8s-single-gpu:
+	helm upgrade nvdp nvdp/nvidia-device-plugin -n nvidia-device-plugin --version $(NVDP_VERSION) \
+	  --reset-values --set runtimeClassName=nvidia
+
+k8s-tenants:
+	kubectl apply -k k8s/tenants/overlays/tenant-a
+	kubectl apply -k k8s/tenants/overlays/tenant-b
+
+# Needs both tenant vLLMs Ready.
+isolation-test:
+	k8s/tests/isolation-test.sh

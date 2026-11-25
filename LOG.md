@@ -218,3 +218,22 @@ Sandbox only, on the same WSL2 machine as k3s (Europe/Berlin offset +01:00 in th
 ### CNI and network-policy controller (checked before writing any policy)
 - k3s v1.36.5+k3s1 with default server options: flannel (VXLAN backend) plus the network policy controller built into k3s (kube-router based, v2.6.3-k3s1 in the journal). No `--disable-network-policy`, no config file.
 - No NetworkPolicy objects existed. A running controller is not proof of enforcement; the isolation test checks that. Raw: `results/isolation/cni.txt`.
+
+### What was added
+`k8s/tenants/` (base, overlays `tenant-a`/`tenant-b`, `test-client.yaml`, `load-weights.sh`), `k8s/tests/isolation-test.sh`, a CI step validating the rendered overlays, `results/isolation/`.
+
+### Commands (user kubeconfig, no sudo)
+- `kubectl -n llm-inference scale deploy/vllm --replicas=0`
+- `helm upgrade nvdp nvdp/nvidia-device-plugin --version 0.20.1 --reset-values -f k8s/sharing/device-plugin-timeslicing-values.yaml` (allocatable `nvidia.com/gpu` became 2)
+- `k8s/tenants/load-weights.sh tenant-a ~/apptainer-images/hf` and the same for `tenant-b`. Source: the weights copied from the `llm-inference` PVC earlier the same day; no checksum verification. 5.2 GB per tenant.
+- Scaled `tenant-a` then `tenant-b` to 1 (Ready after 134 s and 125 s, single observations; GPU memory 8,401 MiB then 14,519 MiB).
+- `k8s/tests/isolation-test.sh > results/isolation/isolation-test.txt`
+- Revert: tenants to 0; `helm upgrade ... --reset-values --set runtimeClassName=nvidia` (allocatable back to 1); `llm-inference/vllm` back to 1 and Ready.
+
+### Problems and fixes
+- The first version of the API-egress check treated any exception as "blocked", so a reachable API server returning 401 or a certificate error would also have passed. Fixed (any HTTP answer counts as reached) and a baseline control added, which returned 401 with no policies.
+- A rerun immediately after a run gave 9 `error` results: probe pods and namespaces from the previous run were still terminating. The script now removes leftovers and waits before starting. The saved output is the clean run: 20 passed, 0 failed.
+- NetworkPolicy cannot express "only `/metrics`"; Prometheus is allowed port 8000.
+
+### Left on the machine
+Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
