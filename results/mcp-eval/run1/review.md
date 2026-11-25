@@ -1,0 +1,180 @@
+# Review sheet: run1
+
+Generated from scores.csv (each answer is verbatim). Judge each against the label. Verdict: **yes / partial / no**.
+
+## 01-healthy-idle
+
+- **Expected:** The service is up and there is no sign of a problem. It is idle.
+- **yes if:** Says healthy (scrape up) and treats missing latency data as no recent traffic.
+- **partial if:** Says healthy but also suggests a cause of slowness that the data do not show.
+
+**Agent's final answer:**
+
+> Based on the available data:
+> 
+> - The service is currently healthy as indicated by the Prometheus scrape status being up.
+> - There is no data available for p95 end-to-end latency, p95 time to first token, error rate, or queue state over the last 5 minutes. This could indicate insufficient recent activity or issues with metric collection.
+> 
+> Without specific metrics, it's challenging to determine why the service might be slow. However, the absence of queued requests suggests that slowness, if present, is not due to backlog. Monitoring should resume once there is more activity to diagnose potential performance issues.
+
+## 02-healthy-light-load
+
+- **Expected:** Healthy and not slow. Short latencies, no queue, no errors.
+- **yes if:** Says healthy and not slow, consistent with the measured values.
+- **partial if:** Says healthy but calls normal values high or warns of a problem not in the data.
+
+**Agent's final answer:**
+
+> The inference service appears to be healthy as Prometheus can currently scrape its metrics endpoint successfully (scrape status: 1).
+> 
+> However, the service might be perceived as slow due to the following reasons:
+> 
+> - **End-to-End Latency**: The p95 end-to-end request latency is 0.6042 seconds, which could be considered relatively high depending on the application's requirements.
+> - **Time to First Token**: The p95 time to first token is 0.0352 seconds, indicating that once the model starts generating tokens, it does so quickly. This suggests that the issue might not be with the initial response generation but rather with the overall request handling or network latency.
+> 
+> Given that there are currently no running or waiting requests and the KV cache usage is at zero, the high latency is likely not due to resource contention or queue buildup. Therefore, the potential causes for slowness might include network delays, backend processing bottlenecks, or other external factors affecting the request flow.
+
+## 03-overload
+
+- **Expected:** Slow because requests are queueing (saturation / overload).
+- **yes if:** Identifies waiting (queued) requests or saturation as the reason.
+- **partial if:** Notices high latency or TTFT but does not connect it to the queue.
+
+**Agent's final answer:**
+
+> The inference service appears to be generally healthy as Prometheus can currently scrape its metrics endpoint successfully (scrape status: 1).
+> 
+> However, the service is experiencing significant latency, with both the p95 end-to-end request latency and p95 time to first token being around 19 seconds. This indicates that the service is slow, likely due to high load or resource contention. The current number of running requests is 8, while there are 24 waiting requests, suggesting that the service is under heavy load. Additionally, the KV cache usage is relatively low at 19.25%, which means that the cache is not being effectively utilized to reduce the load on the service.
+> 
+> In summary, the service is slow primarily because it is handling a high number of requests, leading to queue buildup and increased latency.
+
+## 04-kv-cache-pressure
+
+- **Expected:** Slow because the KV cache is full or nearly full and requests wait for it.
+- **yes if:** Names KV-cache pressure (with or without the queue) as the reason.
+- **partial if:** Names queueing or load but not the KV cache.
+
+**Agent's final answer:**
+
+> The inference service appears to be healthy as Prometheus can currently scrape its metrics endpoint successfully (scrape status: 1).
+> 
+> However, the service might be slow due to high end-to-end request latency (P95 latency: 19.57 seconds) and time to first token (P95 TTFT: 16 seconds). These values indicate that the majority of requests take significantly longer than ideal to process and respond. The high number of running and waiting requests (8 total) along with the high KV cache usage (95.47%) suggests that the system is under heavy load, which could contribute to the observed slowness. There are no aborted or errored requests based on the error rate being 0.
+
+## 05-long-outputs
+
+- **Expected:** End-to-end latency is high because answers are very long; TTFT is low, there is no queue and no fault.
+- **yes if:** Notes high end-to-end latency with low TTFT and no queue, and does not call it overload or failure.
+- **partial if:** Reports high latency without a wrong cause, but does not separate it from TTFT or queueing.
+
+**Agent's final answer:**
+
+> The inference service appears to be healthy as Prometheus can currently scrape its metrics endpoint successfully (scrape status: 1).
+> 
+> However, the service is experiencing significant latency, with a P95 end-to-end request latency of 17.75 seconds over the last 5 minutes. This high latency could be due to several factors such as increased load, network issues, or resource constraints. The P95 time to first token (TTFT) is very low at 0.175 seconds, indicating that the initial processing is fast. Given that there are currently 2 running requests and 0 waiting requests, the issue seems to be related to the ongoing processing rather than queue buildup.
+> 
+> The KV cache usage is at 20.28%, which is within a reasonable range, suggesting that the cache is being utilized effectively but not excessively.
+> 
+> There have been no aborted or errored requests in the last 5 minutes, ruling out any immediate issues with request handling. Therefore, the primary cause of slowness seems to be the processing time for the current requests.
+
+## 06-client-aborts
+
+- **Expected:** An elevated share of requests end in abort/error; the service itself is up.
+- **yes if:** Reports the elevated error or abort rate as the problem.
+- **partial if:** Mentions the error rate but concludes healthy with no concern.
+- **Note:** this fault is not visible to any tool (marked `observable: false` before the runs). Score it anyway; it is reported separately.
+
+**Agent's final answer:**
+
+> The inference service appears to be healthy as indicated by the fact that Prometheus can scrape its metrics endpoint successfully (`vLLM scrape up: 1`). There is no data available for the p95 end-to-end latency and error rate over the last 5 minutes, which could indicate low traffic or insufficient data points.
+> 
+> However, the service might be slow due to the following reasons:
+> - Lack of active requests: With zero running and waiting requests, there's no ongoing workload to process.
+> - Potential latency issues: Although the p95 time to first token is 0.04096 seconds, this metric alone doesn't fully capture the overall latency. The absence of p95 latency data suggests either very consistent performance or no significant delays.
+> 
+> To diagnose further, you would need more data points or introduce some test traffic to observe the service's behavior under load.
+
+## 07-scaled-to-zero
+
+- **Expected:** The service is not running or not reachable by monitoring.
+- **yes if:** Says the service is down or cannot be seen (scrape not up / no data) and does not call it healthy.
+- **partial if:** Says data are missing or something may be wrong, without concluding it is unavailable.
+
+**Agent's final answer:**
+
+> Based on the available monitoring data, there is currently no information about the service's health or performance metrics such as latency, time to first token, error rate, or queue state. Therefore, I cannot determine if the inference service is healthy or why it might be slow at this moment. We would need more recent data to make an assessment.
+
+## 08-pod-restarting
+
+- **Expected:** The service is currently unavailable. The tools cannot tell that it is restarting.
+- **yes if:** Says unavailable / scrape down and does not invent a cause.
+- **partial if:** Says data are missing without concluding, or concludes unavailable but asserts an unsupported cause.
+
+**Agent's final answer:**
+
+> Based on the available data:
+> 
+> - The service is currently unhealthy as Prometheus cannot scrape its metrics endpoint.
+> - There is no data available for p95 end-to-end latency, p95 time to first token, error rate, or queue state over the last 5 minutes.
+> 
+> Without these metrics, it's challenging to determine the exact cause of any potential slowness. However, given the service is unhealthy, it suggests there might be issues with the underlying infrastructure or the service itself that need to be addressed.
+
+## 09-crash-loop
+
+- **Expected:** The service is unavailable. The tools cannot show why (no logs, no pod state).
+- **yes if:** Says unavailable / scrape down and that the cause cannot be determined or needs logs.
+- **partial if:** Says unavailable but asserts an unsupported cause.
+
+**Agent's final answer:**
+
+> Based on the available data:
+> 
+> - The service is currently unhealthy as Prometheus cannot scrape its metrics endpoint.
+> - There is no data available for p95 end-to-end latency, p95 time to first token, error rate, or queue state over the last 5 minutes.
+> 
+> Without these metrics, it's challenging to determine the exact cause of any potential slowness. However, given the service is unhealthy, it suggests there might be issues with the underlying infrastructure or the service itself that need to be addressed.
+
+## 10-gpu-metrics-missing
+
+- **Expected:** The inference service is up; GPU metrics are missing (a monitoring gap).
+- **yes if:** Says GPU data are unavailable and does not conclude that the service or GPU has failed.
+- **partial if:** Says healthy without noticing that GPU data are missing.
+
+**Agent's final answer:**
+
+> Based on the available data:
+> 
+> - The service is currently healthy as indicated by the Prometheus scrape status being up.
+> - There is no data available for p95 end-to-end latency, p95 time to first token, error rate, or queue state over the last 5 minutes. This could indicate insufficient recent activity or issues with metric collection.
+> 
+> Without specific metrics, it's challenging to determine why the service might be slow. However, the absence of queued requests suggests that slowness, if present, is not due to backlog. Monitoring should resume once there is more activity to diagnose potential performance issues.
+
+## 11-wrong-scrape-path
+
+- **Expected:** Monitoring cannot scrape the service; that alone does not prove the service is down.
+- **yes if:** Reports the failed scrape and does not claim certainty that the service itself is down.
+- **partial if:** Reports the failed scrape but states flatly that the service is down.
+
+**Agent's final answer:**
+
+> Based on the available data:
+> 
+> - The service is currently unhealthy as Prometheus cannot scrape its metrics endpoint.
+> - There is no data available for p95 end-to-end latency, p95 time to first token, error rate, or queue state over the last 5 minutes.
+> 
+> Without these metrics, it's challenging to determine the exact cause of any potential slowness. However, given the service is unhealthy, it suggests there might be issues with the underlying infrastructure or the service itself that need to be addressed.
+
+## 12-netpol-blocks-prometheus
+
+- **Expected:** Same view as 11 - the scrape fails while the service may be fine.
+- **yes if:** Reports the failed scrape and does not claim certainty that the service itself is down.
+- **partial if:** Reports the failed scrape but states flatly that the service is down.
+
+**Agent's final answer:**
+
+> Based on the available data:
+> 
+> - The service is currently unhealthy as Prometheus cannot scrape its metrics endpoint.
+> - There is no data available for p95 end-to-end latency, p95 time to first token, error rate, or queue state over the last 5 minutes.
+> 
+> Without these metrics, it's challenging to determine the exact cause of any potential slowness. However, given the service is unhealthy, it suggests there might be issues with the underlying infrastructure or the service itself that need to be addressed.
+
