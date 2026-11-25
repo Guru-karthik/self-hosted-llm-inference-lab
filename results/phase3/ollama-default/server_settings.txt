@@ -1,0 +1,11 @@
+OLLAMA_CONTEXT_LENGTH:0
+OLLAMA_FLASH_ATTENTION:false
+OLLAMA_KV_CACHE_TYPE:
+OLLAMA_MAX_LOADED_MODELS:0
+OLLAMA_MAX_QUEUE:512
+OLLAMA_NUM_PARALLEL:1
+NAME                          ID              SIZE      PROCESSOR    CONTEXT    RUNNER      UNTIL              
+qwen2.5:7b-instruct-q4_K_M    845dbda0ea48    4.8 GB    100% GPU     4096       llamacpp    4 minutes from now    
+      2 n_ctx                 = 4096
+      2 n_ctx = 4096
+      2 n_seq_max             = 1
