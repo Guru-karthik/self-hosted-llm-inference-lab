@@ -1,6 +1,6 @@
 # Self-hosted LLM inference lab
 
-A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Everything here was run on one machine, on 2026-10-29 except the [repeated benchmark runs](#repeated-runs-and-ollama-with-parallelism-tuned), [AI-operations evaluation](#ai-operations-evaluation), [two-tenant isolation](#two-tenants-on-one-gpu) and [Slurm sandbox](#slurm-sandbox) work (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
+A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Later work added a two-tenant isolation test, a single-node Slurm sandbox, repeated benchmark runs, a verified model-fetch Job and a small fault-injection evaluation of a read-only operations agent. Everything here was run on one machine, on 2026-10-29 except the [repeated benchmark runs](#repeated-runs-and-ollama-with-parallelism-tuned), [AI-operations evaluation](#ai-operations-evaluation), [two-tenant isolation](#two-tenants-on-one-gpu) and [Slurm sandbox](#slurm-sandbox) work (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
 
 This is a learning/portfolio project for AI-infrastructure platform engineering. It is **not** a production platform, and the [limitations](#limitations) and [what I did not do](#what-i-did-not-do) sections are part of the result.
 
@@ -23,7 +23,8 @@ A shorter read: the [technical report](docs/report.md) (question, method, result
 | `slurm/`, `scripts/setup-slurm-wsl.sh` | Single-node Slurm sandbox: config, scheduling demos, job scripts, Apptainer test; setup needs sudo |
 | `k8s/model-fetch/` | Job that verifies model files against a pinned manifest |
 | `mcp/eval/` | Labelled fault injection, runner, score sheets, prompt-injection cases |
-| `docs/` | Write-ups: a pod download problem, and a [design note on Slurm and Kubernetes sharing GPUs](docs/slurm-vs-kubernetes.md) |
+| `scripts/render-results.py` | Generates the benchmark tables of this README and the report from `results/` |
+| `docs/` | [Technical report](docs/report.md); [pod download problem](docs/pod-network-download-issue.md); [model requests](docs/model-requests.md); design notes (not built) on [Slurm and Kubernetes sharing GPUs](docs/slurm-vs-kubernetes.md) and on [federation, tenant observability and identity](docs/federation-and-tenant-observability.md) |
 | `.github/workflows/ci.yaml`, `Makefile` | CI (yamllint, pytest, kubeconform, helm lint) and reproduction targets |
 | `LOG.md` | Chronological lab notebook |
 
@@ -33,36 +34,46 @@ A shorter read: the [technical report](docs/report.md) (question, method, result
 flowchart LR
   subgraph host["Windows host: RTX 5070 Ti 16 GB, Docker Desktop"]
     subgraph wsl["WSL2 Ubuntu 24.04"]
-      subgraph p1["Phase 1: Docker (one at a time)"]
+      subgraph docker["Docker comparison (one engine at a time)"]
         O["Ollama<br/>GGUF Q4_K_M"]
         V1["vLLM<br/>AWQ 4-bit"]
       end
-      subgraph k3s["Phase 2: single-node k3s"]
+      subgraph k3s["Single-node k3s"]
         subgraph nsi["ns: llm-inference (ResourceQuota)"]
           V2["vLLM Deployment<br/>tool calling enabled"] --- SVC["Service :8000"]
           V2 --- PVC[("PVC hf-cache")]
-          VAB["Stretch C only: vLLM A + B<br/>time-sliced, 1 GPU as 2 units"]
+          JOB["model-fetch Job<br/>checks digests, size, format"] --> STORE[("PVC model-store")]
+          PVC -->|"file:// source"| JOB
+        end
+        subgraph tenants["ns: tenant-a, tenant-b (run on demand)"]
+          T["vLLM per tenant<br/>quota, RBAC, NetworkPolicy"]
         end
         subgraph nsm["ns: monitoring"]
-          PR["Prometheus"] --> GF["Grafana<br/>dashboard from ConfigMap"]
+          PR["Prometheus"] --> GF["Grafana"]
           DC["DCGM exporter"]
         end
-        PLUG["NVIDIA device plugin"]
+        PLUG["NVIDIA device plugin<br/>time-slicing only when needed"]
       end
-      subgraph mcpbox["Stretch D: MCP (local processes)"]
-        AG["mcp/agent.py<br/>MCP client + tool-calling loop"] -->|stdio| MS["mcp/server.py<br/>8 read-only tools, call log"]
+      subgraph ops["Local processes"]
+        AG["mcp/agent.py"] -->|stdio| MS["mcp/server.py<br/>8 read-only tools"]
+        EV["mcp/eval<br/>fault injection"]
       end
+      SL["Slurm sandbox<br/>not coordinated with k3s"]
     end
   end
   B["benchmark/bench.py"] -->|OpenAI API| O
   B -->|OpenAI API| V1
-  B -->|port-forward| SVC
-  PR -->|"/metrics via ServiceMonitor"| V2
-  PR -->|"GPU metrics"| DC
+  B -->|OpenAI API| SVC
+  SL -->|"runs benchmark jobs"| B
+  PR -->|"/metrics"| V2
+  PR -->|"/metrics"| T
+  PR --> DC
   PLUG -.->|nvidia.com/gpu| V2
-  PLUG -.->|"2 x nvidia.com/gpu"| VAB
-  MS -->|"fixed PromQL, HTTP GET"| PR
-  AG -->|"chat + tools"| SVC
+  PLUG -.->|"time-sliced units"| T
+  MS -->|"fixed PromQL"| PR
+  AG -->|"chat and tools"| SVC
+  EV -->|"breaks, then restores"| V2
+  EV --> AG
 ```
 
 ## Environment (as observed)
@@ -80,6 +91,8 @@ flowchart LR
 | NVIDIA stack | Container Toolkit 1.20.1, k8s-device-plugin chart 0.20.1 |
 | Monitoring | kube-prometheus-stack chart 92.15.0, dcgm-exporter chart 4.8.4 (image tag 4.6.1-4.8.4-distroless), Helm v3.22.1 |
 | Benchmark | Python 3.12.12, requests 2.34.2, pytest 9.2.0 |
+| MCP | Python SDK 2.3.0 |
+| Slurm sandbox | Slurm 23.11.4, Apptainer 1.5.5 ([versions](results/slurm/versions.txt)) |
 
 ## Methodology
 
