@@ -1,0 +1,14 @@
+# The model fetch Job with its script and manifest mounted from a ConfigMap.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: llm-inference
+resources:
+  - 10-pvc.yaml
+  - 20-job.yaml
+configMapGenerator:
+  - name: model-fetch
+    files:
+      - fetch.py
+      - manifest.json=manifests/qwen2.5-7b-awq.json
+generatorOptions:
+  disableNameSuffixHash: true

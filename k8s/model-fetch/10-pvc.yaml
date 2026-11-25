@@ -1,0 +1,10 @@
+# Destination for verified models, separate from the hand-filled hf-cache volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-store
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi

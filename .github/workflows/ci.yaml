@@ -55,6 +55,7 @@ jobs:
             kubectl kustomize "k8s/tenants/overlays/$tenant" \
               | kubeconform -strict -summary -ignore-missing-schemas
           done
+          kubectl kustomize k8s/model-fetch | kubeconform -strict -summary
 
       - name: Render and validate Helm releases with repo values
         run: make helm-validate
