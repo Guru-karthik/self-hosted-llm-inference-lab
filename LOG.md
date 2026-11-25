@@ -266,3 +266,15 @@ Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
 ### bench.py
 - Added `--runs` (default 5), concurrency 16 in the default levels, aggregate output tokens/s (all output tokens / wall time of the batch) and, across runs, mean, sample standard deviation and a 95% Student t interval. `summary` keeps its old fields, now pooled over runs; `run_summaries`, `across_runs` and a CSV `run` column are new. `slurm/jobs/bench-array.sbatch` passes `--runs 1` to keep its old meaning.
 - Trial run against the k3s ClusterIP: 5 of 48 requests at concurrency 2 failed in about 1 ms with a connection error. `ip route get` shows that host-to-ClusterIP traffic goes via the LAN default gateway on `eth1`, so a momentary loss of that route would explain it, as well as the earlier `Network is unreachable` messages. Not confirmed. The Phase 3 runs use `localhost` ports.
+
+### Sweeps (Docker, one engine at a time, via Slurm)
+- Docker Desktop was started by the user. `kubectl -n llm-inference scale deploy/vllm --replicas=0` first; GPU memory before each engine 1,320 / 1,312 / 1,308 MiB.
+- `slurm/jobs/bench-engine.sbatch`, array jobs 36 (vLLM, `scripts/start-runtime.sh vllm`), 41 (Ollama default, `start-runtime.sh ollama`), 46 (Ollama tuned, compose override). All 15 array tasks COMPLETED; 400/400 requests succeeded for each engine.
+- Ollama server config: default `NUM_PARALLEL:1`; tuned `NUM_PARALLEL:8`, `CONTEXT_LENGTH:4096`, `n_seq_max = 8`, `n_ctx_slot = 4096`.
+- The reused vLLM container's log also held October lines; only today's were saved.
+- Afterwards the Ollama container was stopped and `llm-inference/vllm` scaled back to 1.
+
+### Tables and checks
+- `scripts/render-results.py` regenerated the four existing hand-written README tables with no difference.
+- GitHub returned `Internal Server Error` on several pushes (2026-11-25 afternoon); retries succeeded.
+- Checks: `make render-check test lint PY=.venv-mcp/bin/python`.

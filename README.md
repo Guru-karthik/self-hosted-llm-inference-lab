@@ -1,6 +1,6 @@
 # Self-hosted LLM inference lab
 
-A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Everything here was run on one machine, on 2026-10-29 except the [two-tenant isolation](#two-tenants-on-one-gpu) and [Slurm sandbox](#slurm-sandbox) work (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
+A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Everything here was run on one machine, on 2026-10-29 except the [repeated benchmark runs](#repeated-runs-and-ollama-with-parallelism-tuned), [AI-operations evaluation](#ai-operations-evaluation), [two-tenant isolation](#two-tenants-on-one-gpu) and [Slurm sandbox](#slurm-sandbox) work (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
 
 This is a learning/portfolio project for AI-infrastructure platform engineering. It is **not** a production platform, and the [limitations](#limitations) and [what I did not do](#what-i-did-not-do) sections are part of the result.
 
@@ -10,7 +10,7 @@ This is a learning/portfolio project for AI-infrastructure platform engineering.
 |---|---|
 | `docker/compose.yaml`, `scripts/start-runtime.sh` | Digest-pinned Ollama and vLLM services; the script runs one engine at a time on the GPU |
 | `benchmark/` | Python benchmark client (OpenAI-compatible streaming API) and pytest tests for parsing and statistics |
-| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/`, `slurm/`, `isolation/`, `mcp-eval/` |
+| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/`, `slurm/`, `isolation/`, `mcp-eval/`, `phase3/` |
 | `k8s/vllm/` | Namespace + ResourceQuota, model-cache PVC, vLLM Deployment, Service |
 | `k8s/monitoring/` | Helm values for kube-prometheus-stack and the DCGM exporter, vLLM ServiceMonitor, dashboard ConfigMap |
 | `dashboards/` | Grafana dashboard JSON (11 panels) |
@@ -87,7 +87,7 @@ flowchart LR
 - **End-to-end latency** p50 (median) and p95 (nearest-rank) over successful requests; failures are counted separately (failure rate).
 - **Peak VRAM**: maximum `nvidia-smi` memory use over the whole GPU while the level ran.
 
-Only one engine used the GPU at a time, except in the deliberate time-slicing experiment below. Each configuration was run **once**.
+Only one engine used the GPU at a time, except in the deliberate time-slicing experiment below. In the first set of results (2026-10-29) each configuration was run **once**; the [repeated runs](#repeated-runs-and-ollama-with-parallelism-tuned) came later. The tables of benchmark and start-up numbers are generated from `results/` by [`scripts/render-results.py`](scripts/render-results.py), and CI fails if they differ.
 
 ## Results
 
@@ -120,16 +120,18 @@ Other measured facts:
 What the data show on this machine and workload (short prompts, 64 output tokens):
 
 - **Single stream is a tie.** At concurrency 1 both engines generate at roughly 146 tokens/s with end-to-end latency near 0.45 s.
-- **Concurrency is where they differ.** Ollama's TTFT p50 rose from 0.02 s to 3.14 s (concurrency 1 to 8) while its per-request tokens/s stayed flat at about 145; this pattern is consistent with requests being handled one after another. vLLM's TTFT p50 stayed between 0.016 and 0.035 s and its end-to-end p50 between 0.45 and 0.47 s. I did **not** investigate why Ollama behaved this way (for example its parallelism settings were left at defaults), so this is an observation about default behaviour, not a statement about what Ollama can do when tuned.
+- **Concurrency is where they differ.** Ollama's TTFT p50 rose from 0.02 s to 3.14 s (concurrency 1 to 8) while its per-request tokens/s stayed flat at about 145; this pattern is consistent with requests being handled one after another (confirmed later: the default was one parallel slot, see [repeated runs](#repeated-runs-and-ollama-with-parallelism-tuned)). vLLM's TTFT p50 stayed between 0.016 and 0.035 s and its end-to-end p50 between 0.45 and 0.47 s. This table is about default behaviour only.
 - **VRAM figures are not comparable.** vLLM pre-allocates memory according to `--gpu-memory-utilization`, so its 13.5 GiB reflects that setting, not what the model needs. Ollama's 6.2 GiB figure includes about 1 GiB already used by other processes before the run.
 
 **Not apples-to-apples:**
 
 - Different quantisation formats and kernels: GGUF Q4_K_M (llama.cpp backend) vs AWQ 4-bit (Marlin kernels in vLLM). Output quality was **not** compared.
 - Different runtimes with different defaults (batching, KV-cache sizing, context length: vLLM was capped at 4,096 tokens).
-- Short, fixed prompts and 64 output tokens only; no long-context or sustained-load test; one run per configuration, so no confidence intervals.
+- Short, fixed prompts and 64 output tokens only; no long-context or sustained-load test; one run per configuration in this table, so no confidence intervals (see the next section).
 
 ### Repeated runs, and Ollama with parallelism tuned
+
+Run on 2026-11-25 in Docker: each concurrency level 5 times (`bench.py --runs 5`, 16 requests per run, 80 per level), one engine at a time, driven by a [Slurm job array](slurm/jobs/bench-engine.sbatch). Values are the **mean over the 5 runs ± half-width of the 95% confidence interval** (Student t); standard deviations and every request are in [`results/phase3/`](results/phase3/). "Aggregate" is all output tokens divided by the wall time of the batch. Ollama "defaults" reported `OLLAMA_NUM_PARALLEL:1`; "tuned" used [`OLLAMA_NUM_PARALLEL=8` and `OLLAMA_CONTEXT_LENGTH=4096`](docker/compose.ollama-tuned.yaml), matching vLLM's 8 sequences and 4,096 tokens (server settings: [default](results/phase3/ollama-default/server_settings.txt), [tuned](results/phase3/ollama-tuned/server_settings.txt)). The earlier single-run results are kept above, unchanged.
 
 <!-- BEGIN generated: repeated-runs -->
 | Setup | Concurrency | OK | TTFT p50 (s) | Tok/s per request p50 | E2E p50 (s) | Aggregate output tok/s | Peak VRAM |
@@ -150,6 +152,17 @@ What the data show on this machine and workload (short prompts, 64 output tokens
 | Ollama 0.40.13, tuned (8 slots) | 8 | 80/80 | 0.056 ± 0.012 | 70.7 ± 7.6 | 0.940 ± 0.092 | 520.2 ± 52.7 | 7813 |
 | Ollama 0.40.13, tuned (8 slots) | 16 | 80/80 | 0.398 ± 0.058 | 76.7 ± 5.6 | 1.240 ± 0.066 | 564.4 ± 54.2 | 7813 |
 <!-- END generated: repeated-runs -->
+
+- **The default explains the earlier gap in TTFT.** With one slot, Ollama's TTFT p50 grew from 0.023 s to 3.248 s between concurrency 1 and 8, and aggregate throughput stayed near 129 to 136 tokens/s.
+- **Tuning changed the picture.** With 8 slots, at concurrency 8 TTFT p50 was 0.056 s (vLLM: 0.066 s; the two intervals overlap) and aggregate throughput 520.2 tokens/s instead of 135.9. It cost per-request speed (70.7 instead of 141.0 tokens/s).
+- **vLLM still delivered more in total:** 968.3 aggregate tokens/s at concurrency 8, against 520.2 for tuned Ollama.
+- **At concurrency 16** vLLM's aggregate stayed level (974.0) and TTFT rose to 0.307 s: it runs 8 sequences and queues the rest, so this level measures queueing too.
+- Tuned Ollama was also slower per request at concurrency 1 (113.0 against 137.3 tokens/s). I did not profile why.
+
+#### What this does NOT show
+
+The intervals cover run-to-run variation **within one session on one machine**, five runs back to back, with the server already warm. They do not cover day-to-day variation, which can be larger: at concurrency 1 the October single run of vLLM gave TTFT 0.016 s and 146.5 tokens/s, outside today's intervals (the KV cache also differed: 130,720 against 116,016 tokens). Quantisation formats and kernels still differ (GGUF Q4_K_M against AWQ 4-bit), output quality was not compared, prompts are short with 64 output tokens, and only one tuned Ollama configuration was tried, not an optimised one. Peak VRAM is not comparable between engines.
+
 
 ### Docker vs Kubernetes
 
@@ -362,6 +375,12 @@ make docker-ollama && make bench-ollama
 make docker-vllm   # wait until http://localhost:8000/v1/models responds, then:
 make bench-vllm
 
+# Repeated runs (stop other GPU users first; needs the Slurm sandbox, or run
+# `python -m benchmark.bench ... --runs 5` directly). Tuned Ollama:
+docker compose -f docker/compose.yaml -f docker/compose.ollama-tuned.yaml --profile ollama up -d ollama
+sbatch --export=ALL,NAME=ollama-tuned,ENGINE=ollama,VERSION=0.40.13,IMAGE=ollama/ollama@sha256:b2f0...,URL=http://localhost:11435/v1,MODEL=qwen2.5:7b-instruct-q4_K_M slurm/jobs/bench-engine.sbatch
+python scripts/render-results.py          # regenerate the README tables
+
 # Phase 2
 ./scripts/setup-k3s-wsl.sh        # NVIDIA toolkit, k3s, Helm
 make k8s-gpu-plugin k8s-vllm k8s-monitoring k8s-dashboard
@@ -416,7 +435,7 @@ Note: the Makefile targets were written from the commands I ran by hand. `make t
 
 ## Limitations
 
-- Single machine, single GPU, single node; one run per configuration; small prompt set; short outputs.
+- Single machine, single GPU, single node; one run per configuration except the repeated benchmark runs (five runs, one session); small prompt set; short outputs.
 - WSL2 networking and GPU virtualisation may differ from a bare-metal Linux cluster, so absolute numbers may not transfer.
 - Benchmark client and server share the same machine (CPU contention possible).
 - Output quality was not evaluated, only speed.
@@ -427,7 +446,7 @@ Note: the Makefile targets were written from the commands I ran by hand. `make t
 
 - The stretch goals were done only in the limited forms described above: the cold-cache measurement exists only for Docker (one run), scale-to-zero was manual `kubectl scale` without KEDA or Knative, GPU sharing used time-slicing only (no MIG or other isolation), and the MCP agent was evaluated only on a [tiny labelled set](#ai-operations-evaluation).
 - I did not diagnose why pods could not download from Hugging Face ([`docs/pod-network-download-issue.md`](docs/pod-network-download-issue.md)). The weights were copied from the Docker volume into the PVC and vLLM runs with `HF_HUB_OFFLINE=1`, so a network cold start in the cluster was never measured.
-- I did not investigate Ollama's concurrency behaviour or tune it.
+- Ollama was tuned only for parallel slots and context length, one configuration; no search for its best settings.
 - I did not compare the same quantisation format across engines, or measure output quality.
 - No multi-node, multi-GPU, authentication, TLS, autoscaling or alerting setup (Alertmanager is disabled). Multi-tenancy only in the limited form [above](#two-tenants-on-one-gpu).
 - No screenshots of the dashboard.
