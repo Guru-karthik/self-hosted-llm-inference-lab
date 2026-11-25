@@ -212,3 +212,9 @@ Sandbox only, on the same WSL2 machine as k3s (Europe/Berlin offset +01:00 in th
 - Slurm, munge and MariaDB services are enabled at boot (disable command in the setup script header).
 - `~/apptainer-images/hf` (5.2 GB copy of the model weights from the PVC) and `~/.apptainer/cache` (2.6 GB of partial layers). Not deleted.
 - Checks: `make test lint PY=.venv-mcp/bin/python`: 7 + 7 tests passed, yamllint clean.
+
+## 2026-11-25 — Phase 1: two tenants with isolation
+
+### CNI and network-policy controller (checked before writing any policy)
+- k3s v1.36.5+k3s1 with default server options: flannel (VXLAN backend) plus the network policy controller built into k3s (kube-router based, v2.6.3-k3s1 in the journal). No `--disable-network-policy`, no config file.
+- No NetworkPolicy objects existed. A running controller is not proof of enforcement; the isolation test checks that. Raw: `results/isolation/cni.txt`.

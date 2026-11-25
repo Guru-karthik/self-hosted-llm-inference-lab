@@ -1,0 +1,22 @@
+# CNI and NetworkPolicy controller, recorded 2026-11-25. Whether policies are ENFORCED is tested separately.
+
+$ k3s --version
+k3s version v1.36.5+k3s1 (3dd98cc5)
+
+$ k3s.service ExecStart arguments (no --flannel-backend, no --disable-network-policy)
+ExecStart=/usr/local/bin/k3s \
+    server \
+
+$ ls /etc/rancher/k3s/ (no config.yaml)
+k3s.yaml
+
+$ node flannel annotation
+vxlan
+
+$ journalctl -u k3s | grep "network policy controller" | tail -3
+Nov 25 10:20:14 GuruKarthik k3s[192]: time="2026-11-25T10:20:14+01:00" level=info msg="Starting network policy controller version v2.6.3-k3s1, built on 2026-09-30T16:04:14Z, go1.26.8"
+Nov 25 10:20:14 GuruKarthik k3s[192]: I1125 10:20:14.196713     192 network_policy_controller.go:164] Starting network policy controller
+Nov 25 10:20:14 GuruKarthik k3s[192]: I1125 10:20:14.222015     192 network_policy_controller.go:179] Starting network policy controller full sync goroutine
+
+$ kubectl get networkpolicy -A
+No resources found
