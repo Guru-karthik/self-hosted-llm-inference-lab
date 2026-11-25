@@ -104,3 +104,13 @@ def test_command_line_exits_nonzero_when_refused(model, tmp_path, capsys):
     path.write_text(json.dumps(manifest))
     code = main(["--manifest", str(path), "--source", source.as_uri(), "--dest", str(dest), "--max-bytes", "1"])
     assert code == 1 and "REFUSED" in capsys.readouterr().err
+
+
+def test_committed_manifest_passes_the_policy_and_pins_a_commit():
+    from fetch import check_manifest
+
+    path = Path(__file__).resolve().parents[1] / "manifests" / "qwen2.5-7b-awq.json"
+    manifest = json.loads(path.read_text())
+    check_manifest(manifest, 8_000_000_000)
+    assert len(manifest["revision"]) == 40
+    assert all(f["algorithm"] == "sha256" for f in manifest["files"] if f["path"].endswith(".safetensors"))
