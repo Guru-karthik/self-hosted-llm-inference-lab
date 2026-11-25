@@ -1,0 +1,4 @@
+JobID|JobName|Partition|ReqTRES|Submit|Start|End|Elapsed|State
+21|gpu-single|short|billing=2,cpu=2,gres/gpu=1,mem=1G,node=1|2026-11-25T10:53:39|2026-11-25T10:53:39|2026-11-25T10:54:09|00:00:30|COMPLETED
+22|gpu-single|short|billing=2,cpu=2,gres/gpu=1,mem=1G,node=1|2026-11-25T10:53:39|2026-11-25T10:54:09|2026-11-25T10:54:39|00:00:30|COMPLETED
+23|no-gres|short|billing=2,cpu=2,mem=1G,node=1|2026-11-25T10:53:40|2026-11-25T10:53:47|2026-11-25T10:53:47|00:00:00|COMPLETED

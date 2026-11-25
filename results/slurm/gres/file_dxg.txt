@@ -1,0 +1,4 @@
+# gres.conf: NodeName=GuruKarthik Name=gpu File=/dev/dxg
+$ slurmd -D -G -v
+slurmd: Gres Name=gpu Type=(null) Count=1 Index=0 ID=7696487 File=/dev/dxg Links=(null) Flags=HAS_FILE,ENV_NVML,ENV_RSMI,ENV_ONEAPI,ENV_OPENCL,ENV_DEFAULT
+exit=0

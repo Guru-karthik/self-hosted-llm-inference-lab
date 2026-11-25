@@ -1,0 +1,8 @@
+cuInit: rc=0
+cuDeviceGet: rc=0
+cuDeviceGetName: rc=0
+device: NVIDIA GeForce RTX 5070 Ti
+cuCtxCreate_v2: rc=0
+cuMemAlloc_v2 (1 MiB): rc=0
+cuMemFree_v2: rc=0
+cuCtxDestroy_v2: rc=0

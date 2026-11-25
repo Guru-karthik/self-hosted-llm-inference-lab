@@ -1,0 +1,27 @@
+# Before the demo
+PriorityParameters      = (null)
+PrioritySiteFactorParameters = (null)
+PrioritySiteFactorPlugin = (null)
+PriorityDecayHalfLife   = 7-00:00:00
+PriorityCalcPeriod      = 00:01:00
+PriorityFavorSmall      = No
+PriorityFlags           = 
+PriorityMaxAge          = 1-00:00:00
+PriorityUsageResetPeriod = NONE
+PriorityType            = priority/multifactor
+PriorityWeightAge       = 1000
+PriorityWeightAssoc     = 0
+PriorityWeightFairShare = 100000
+PriorityWeightJobSize   = 0
+PriorityWeightPartition = 10000
+PriorityWeightQOS       = 200000
+PriorityWeightTRES      = (null)
+$ sshare -a -l
+Account               RawShares  NormShares    RawUsage  EffectvUsage  FairShare    LevelFS 
+-------------------- ---------- ----------- ----------- ------------- ---------- ---------- 
+root                               0.000000           0      1.000000                       
+ root                         1    0.009901           0      0.000000   1.000000        inf 
+ research                    70    0.693069           0      0.000000                   inf 
+  research                    1    1.000000           0      0.000000   1.000000        inf 
+ teaching                    30    0.297030           0      0.000000                   inf 
+  teaching                    1    1.000000           0      0.000000   1.000000        inf 

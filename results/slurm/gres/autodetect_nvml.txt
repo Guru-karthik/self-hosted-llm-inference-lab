@@ -1,0 +1,5 @@
+# gres.conf: AutoDetect=nvml
+$ slurmd -D -G -v
+slurmd: We were configured with nvml functionality, but that lib wasn't found on the system.
+slurmd: Ignoring file-less GPU gpu:(null) from final GRES list
+exit=0

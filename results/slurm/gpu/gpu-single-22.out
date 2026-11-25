@@ -1,0 +1,6 @@
+job=22
+SLURM_JOB_GPUS=0
+SLURM_GPUS_ON_NODE=1
+CUDA_VISIBLE_DEVICES=0
+name, memory.total [MiB], memory.used [MiB], utilization.gpu [%]
+NVIDIA GeForce RTX 5070 Ti, 16303 MiB, 13308 MiB, 0 %

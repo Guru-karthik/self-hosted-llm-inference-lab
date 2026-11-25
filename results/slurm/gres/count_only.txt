@@ -1,0 +1,4 @@
+# gres.conf: NodeName=GuruKarthik Name=gpu Count=1
+$ slurmd -D -G -v
+slurmd: Ignoring file-less GPU gpu:(null) from final GRES list
+exit=0

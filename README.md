@@ -1,6 +1,6 @@
 # Self-hosted LLM inference lab
 
-A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Everything here was run on one machine on 2026-10-29; every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
+A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Everything here was run on one machine, on 2026-10-29 except the [Slurm sandbox](#slurm-sandbox) (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
 
 This is a learning/portfolio project for AI-infrastructure platform engineering. It is **not** a production platform, and the [limitations](#limitations) and [what I did not do](#what-i-did-not-do) sections are part of the result.
 
@@ -10,14 +10,15 @@ This is a learning/portfolio project for AI-infrastructure platform engineering.
 |---|---|
 | `docker/compose.yaml`, `scripts/start-runtime.sh` | Digest-pinned Ollama and vLLM services; the script runs one engine at a time on the GPU |
 | `benchmark/` | Python benchmark client (OpenAI-compatible streaming API) and pytest tests for parsing and statistics |
-| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/` |
+| `results/` | Raw output of every run: benchmarks (`k8s/` in-cluster), `startup/`, `sharing/`, `mcp/`, `slurm/` |
 | `k8s/vllm/` | Namespace + ResourceQuota, model-cache PVC, vLLM Deployment, Service |
 | `k8s/monitoring/` | Helm values for kube-prometheus-stack and the DCGM exporter, vLLM ServiceMonitor, dashboard ConfigMap |
 | `dashboards/` | Grafana dashboard JSON (11 panels) |
 | `scripts/setup-k3s-wsl.sh` | Host setup (NVIDIA container toolkit, k3s, Helm); needs sudo, read before running |
 | `k8s/sharing/` | GPU time-slicing experiment (device-plugin config, two vLLM pods, quota override) |
 | `mcp/` | Read-only Prometheus MCP server, tool-calling agent, tests |
-| `docs/` | Write-up of problems worth knowing about |
+| `slurm/`, `scripts/setup-slurm-wsl.sh` | Single-node Slurm sandbox: config, scheduling demos, job scripts, Apptainer test; setup needs sudo |
+| `docs/` | Write-ups: a pod download problem, and a [design note on Slurm and Kubernetes sharing GPUs](docs/slurm-vs-kubernetes.md) |
 | `.github/workflows/ci.yaml`, `Makefile` | CI (yamllint, pytest, kubeconform, helm lint) and reproduction targets |
 | `LOG.md` | Chronological lab notebook |
 
@@ -181,6 +182,65 @@ What this does and does not show:
 
 Prometheus scrapes vLLM's `/metrics` (a ServiceMonitor) and the DCGM exporter. The dashboard ([`dashboards/llm-inference.json`](dashboards/llm-inference.json)) has panels for e2e latency, TTFT, inter-token latency, tokens/s, requests/s, running vs waiting requests, KV-cache usage, and GPU utilisation, memory, temperature and power. I verified the dashboard loaded into Grafana and that each panel's query returned data after a load run; I did not capture screenshots.
 
+## Slurm sandbox
+
+A **single-node sandbox** to practise batch scheduling concepts. It is not an HPC cluster: `slurmctld`, `slurmd`, `slurmdbd` and MariaDB all run on the same WSL2 machine as k3s. Slurm 23.11.4, Apptainer 1.5.5 ([versions and accounting setup](results/slurm/versions.txt)). Set up with [`scripts/setup-slurm-wsl.sh`](scripts/setup-slurm-wsl.sh) (sudo); config in [`slurm/`](slurm/).
+
+Two partitions (`batch`; `short`, 10 min limit, higher partition factor), two accounts (`research` 70 shares, `teaching` 30) and a QoS `high` (priority 100). Priority is `multifactor`; the weights were chosen to make each effect visible and are not a recommended policy. `sacct`, fair-share and QoS need accounting storage, hence `slurmdbd` and MariaDB.
+
+### The GPU as a Slurm resource
+
+| Declaration | Observed ([raw](results/slurm/gres/)) |
+|---|---|
+| `AutoDetect=nvml` | "configured with nvml functionality, but that lib wasn't found"; GPU ignored (Ubuntu's `slurm-wlm-basic-plugins` ships no `gpu_nvml.so`) |
+| Count only (`Count=1`) | "Ignoring file-less GPU"; the node was drained with `gres/gpu count reported lower than configured (0 < 1)` |
+| `File=/dev/dxg` (used) | Registered as one GPU |
+
+`/dev/dxg` is WSL2's GPU device, so `--gres=gpu:1` here is **bookkeeping, not enforcement** ([raw](results/slurm/gpu/)):
+
+- Of two `--gres=gpu:1` jobs, the second pended on `Resources` until the first ended.
+- A job without `--gres` ran meanwhile and `nvidia-smi -L` listed the GPU.
+- Slurm offered `gpu:1` while the k3s vLLM pod was holding the same GPU (13,308 MiB in use). Slurm does not know about it.
+
+### Priority, fair-share and QoS
+
+A blocker job took all 16 CPUs, jobs queued behind it, then the blocker was cancelled and `sacct` showed the start order ([raw `squeue`/`sprio`/`sshare`/`sacct`](results/slurm/fairshare/)). Beforehand `research` had run 3 jobs of 60 s on 16 CPUs and `teaching` nothing.
+
+| Stage | Submitted in this order | Started in this order | Priority values |
+|---|---|---|---|
+| Fair-share | res-A, res-B, tea-A, tea-B | tea-A, tea-B, res-A, res-B | teaching 101000, research 34333 |
+| QoS | tea-C, tea-D, res-high (QoS `high`) | res-high, tea-C, tea-D | res-high 234333, teaching 67666 |
+| Partition | res-batch (`batch`), res-short (`short`) | res-short, res-batch | short 43333, batch 34333 |
+
+- `research` has more shares (70 vs 30) but had used the node, so `teaching` jumped the queue.
+- The first QoS attempt was invalid (a job started before the blocker did); it is kept as [`3_qos_first_attempt_invalid.txt`](results/slurm/fairshare/3_qos_first_attempt_invalid.txt) and the stage was re-run after fixing the script.
+- One Linux user submitted under both accounts, and each stage was run once to a valid result.
+
+### Benchmark as a job array
+
+[`slurm/jobs/bench-array.sbatch`](slurm/jobs/bench-array.sbatch) ran 12 tasks (concurrency 1, 2, 4, 8, three repeats each) with `%1`, so only one task loaded the server at a time. The server was the k3s vLLM pod; Slurm only ran the client. All 12 tasks completed with 16/16 requests successful; task run times were 1 to 9 s ([`sacct`](results/slurm/bench/sacct.txt), [table](results/slurm/bench/summary_table.txt), raw JSON/CSV beside it).
+
+| Concurrency | TTFT p50 (s), min to max of 3 | Tok/s p50 | E2E p50 (s) |
+|---|---|---|---|
+| 1 | 0.013 | 144.0 to 144.4 | 0.456 to 0.458 |
+| 2 | 0.021 to 0.022 | 145.7 to 146.0 | 0.460 to 0.461 |
+| 4 | 0.025 | 146.0 to 146.2 | 0.462 to 0.463 |
+| 8 | 0.037 to 0.041 | 145.0 to 145.4 | 0.475 to 0.481 |
+
+The client reached vLLM by its ClusterIP, not by port-forward, and the Deployment had since gained tool-calling flags, so these are not directly comparable with the earlier k3s run.
+
+### Apptainer on WSL2
+
+- A `.sif` of the benchmark client built without sudo ([definition](slurm/apptainer/bench-client.def), [log](results/slurm/apptainer/build.log)).
+- `--nv` alone failed: `Failed to initialize NVML: GPU access blocked by the operating system`. Binding `/usr/lib/wsl` and setting `LD_LIBRARY_PATH=/usr/lib/wsl/lib` made `nvidia-smi` work ([raw](results/slurm/apptainer/gpu_visibility.txt)).
+- With that bind, a CUDA context was created and 1 MiB allocated from inside the container ([raw](results/slurm/apptainer/cuda_check.txt)).
+- The client in the `.sif` completed 16/16 requests at each of concurrency 1, 2, 4 and 8 against the k3s vLLM ([results](results/slurm/apptainer/bench/); one run, launched directly rather than through Slurm).
+- **vLLM itself in Apptainer was not run.** Pulling the 9.2 GB (compressed) image failed twice with `read: network is unreachable`, after 23 and 33 minutes ([attempt 1](results/slurm/apptainer/vllm_pull_attempt1.log), [attempt 2](results/slurm/apptainer/vllm_pull_attempt2.log); addresses redacted). The cause was not diagnosed. [`run-vllm.sh`](slurm/apptainer/run-vllm.sh) is the intended test and is **untested**.
+
+### What this does NOT show
+
+Single node, so no node selection, topology, or multi-node jobs; no MPI (the PMIx plugin failed to load and was left that way); no parallel filesystem; no scale, queue contention or many real users. No device isolation: the GPU resource is a counter. No site-style authentication, accounting limits per user, preemption, reservations or backfill study. Slurm and k3s were never coordinated; options for that are a [design note, not tested](docs/slurm-vs-kubernetes.md).
+
 ## How to reproduce
 
 Prerequisites you must provide: a Windows + WSL2 (Ubuntu 24.04, systemd enabled) machine with an NVIDIA GPU and driver supporting CUDA on WSL, Docker Desktop with WSL integration and GPU support, `python3` and `make`. Review [`scripts/setup-k3s-wsl.sh`](scripts/setup-k3s-wsl.sh) (uses sudo) before running it.
@@ -203,13 +263,19 @@ kubectl -n llm-inference port-forward svc/vllm 8001:8000 &
 kubectl -n monitoring port-forward svc/kps-kube-prometheus-stack-prometheus 9090:9090 &
 python mcp/agent.py --llm-url http://localhost:8001/v1 --model qwen2.5-7b-awq --prometheus-url http://localhost:9090
 
+# Slurm sandbox (changes the host, needs sudo; read the script first)
+./scripts/setup-slurm-wsl.sh
+./slurm/demo-fairshare.sh && ./slurm/demo-gpu.sh
+sbatch slurm/jobs/bench-array.sbatch     # needs .venv-test (benchmark/requirements.txt)
+slurm/apptainer/run-apptainer-test.sh "$HOME/bench-client.sif"
+
 # Checks (also run in CI)
 make test lint helm-validate
 ```
 
 The time-slicing experiment (`k8s/sharing/`) and the start-up timings (`scripts/measure-*.sh`) are run by hand and are not Makefile targets; see `LOG.md` for the exact steps.
 
-Note: the Makefile targets were written from the commands I ran by hand; I could not run `make` itself on my machine (it is not installed there), although CI runs `make helm-validate`.
+Note: the Makefile targets were written from the commands I ran by hand. `make test lint` has been run locally (2026-11-25, `make test lint PY=.venv-mcp/bin/python`); the Docker and Kubernetes targets have not been run through `make` on this machine, although CI runs `make helm-validate`.
 
 ## Lessons learned
 
@@ -240,7 +306,7 @@ Note: the Makefile targets were written from the commands I ran by hand; I could
 - I did not compare the same quantisation format across engines, or measure output quality.
 - No multi-node, multi-GPU, multi-tenant, authentication, TLS, autoscaling or alerting setup (Alertmanager is disabled).
 - No screenshots of the dashboard.
-- Did not run `make` locally (not installed); the underlying commands were run individually.
+- Did not run the Docker or Kubernetes `make` targets locally (`make` was not installed at the time of those runs); the underlying commands were run individually.
 
 ## How this maps to a sovereign multi-tenant platform
 

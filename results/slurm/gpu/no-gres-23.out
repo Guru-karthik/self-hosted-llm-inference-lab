@@ -1,0 +1,2 @@
+SLURM_JOB_GPUS=<unset>
+GPU 0: NVIDIA GeForce RTX 5070 Ti (UUID: GPU-42aca3b8-82c8-2ec8-9b3a-8e8125b9e1cd)

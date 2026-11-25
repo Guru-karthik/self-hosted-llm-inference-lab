@@ -1,0 +1,20 @@
+# Apptainer image for the benchmark client only (not the model server), to try running
+# the same client as a .sif. Build from the repo root:
+#   apptainer build bench-client.sif slurm/apptainer/bench-client.def
+Bootstrap: docker
+# python:3.12.12-slim
+From: python@sha256:f3fa41d74a768c2fce8016b98c191ae8c1bacd8f1152870a3f9f87d350920b7c
+
+%files
+    benchmark/bench.py /opt/lab/benchmark/bench.py
+    benchmark/__init__.py /opt/lab/benchmark/__init__.py
+    benchmark/prompts.json /opt/lab/benchmark/prompts.json
+
+%post
+    pip install --no-cache-dir requests==2.34.2
+
+%environment
+    export PYTHONPATH=/opt/lab
+
+%runscript
+    exec python -m benchmark.bench "$@"

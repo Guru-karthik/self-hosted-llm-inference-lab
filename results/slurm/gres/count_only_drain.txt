@@ -1,0 +1,12 @@
+# First install (2026-11-25), gres.conf: NodeName=GuruKarthik Name=gpu Count=1
+$ journalctl -u slurmd | grep -i gpu
+Nov 25 10:36:51 GuruKarthik slurmd[14088]: slurmd: warning: Ignoring file-less GPU gpu:(null) from final GRES list
+
+$ sinfo -R
+REASON|TIMESTAMP|NODELIST
+gres/gpu count reported lower than configured (0 < 1)|2026-11-25T10:36:52|GuruKarthik
+
+$ scontrol show node (State, Gres, Reason)
+   Gres=gpu:1
+   State=UNKNOWN+DRAIN+INVALID_REG ThreadsPerCore=2 TmpDisk=0 Weight=1 Owner=N/A MCS_label=N/A
+   Reason=gres/gpu count reported lower than configured (0 < 1) [slurm@2026-11-25T10:36:52]

@@ -1,0 +1,28 @@
+# research job with QoS high submitted last
+submission order: 18 19 20
+$ sshare -a -l
+Account               RawShares  NormShares    RawUsage  EffectvUsage  FairShare    LevelFS 
+-------------------- ---------- ----------- ----------- ------------- ---------- ---------- 
+root                               0.000000        8636      1.000000                       
+ root                         1    0.009901           0      0.000000   1.000000        inf 
+ research                    70    0.693069        7340      0.849987              0.815388 
+  research                    1    1.000000        7340      1.000000   0.333333   1.000000 
+ teaching                    30    0.297030        1295      0.150013              1.980022 
+  teaching                    1    1.000000        1295      1.000000   0.666667   1.000000 
+$ sprio -l
+  JOBID PARTITION   PRIORITY  FAIRSHARE      AGE      QOS  PARTITION
+     18     batch      67666      66667        0        0       1000
+     19     batch      67666      66667        0        0       1000
+     20     batch     234333      33333        0   200000       1000
+(factor columns are already multiplied by their weights)
+$ squeue (sorted by priority)
+  JOBID           NAME   ACCOUNT     QOS PARTIT    STATE   PRIORITY REASON
+     20       res-high  research    high  batch  PENDING     234333 Resources
+     19          tea-D  teaching  normal  batch  PENDING      67666 Priority
+     18          tea-C  teaching  normal  batch  PENDING      67666 Priority
+     17        blocker  research  normal  batch  RUNNING      34333 None
+$ sacct (sorted by start time)
+JobID|JobName|Account|QOS|Partition|Submit|Start|End|Elapsed|State
+20|res-high|research|high|batch|2026-11-25T10:51:23|2026-11-25T10:52:34|2026-11-25T10:52:53|00:00:19|COMPLETED
+18|tea-C|teaching|normal|batch|2026-11-25T10:51:19|2026-11-25T10:52:53|2026-11-25T10:53:14|00:00:21|COMPLETED
+19|tea-D|teaching|normal|batch|2026-11-25T10:51:21|2026-11-25T10:53:14|2026-11-25T10:53:35|00:00:21|COMPLETED

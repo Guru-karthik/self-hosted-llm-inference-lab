@@ -1,0 +1,22 @@
+# research job with QoS high submitted last
+submission order: 11 12 13
+$ sshare -a -l
+Account               RawShares  NormShares    RawUsage  EffectvUsage  FairShare    LevelFS 
+-------------------- ---------- ----------- ----------- ------------- ---------- ---------- 
+root                               0.000000        6286      1.000000                       
+ root                         1    0.009901           0      0.000000   1.000000        inf 
+ research                    70    0.693069        4990      0.821021              0.844155 
+  research                    1    1.000000        4990      1.000000   0.333333   1.000000 
+ teaching                    30    0.297030        1295      0.178979              1.659578 
+  teaching                    1    1.000000        1295      1.000000   0.666667   1.000000 
+$ sprio -l
+  JOBID PARTITION   PRIORITY  FAIRSHARE      AGE      QOS  PARTITION
+(factor columns are already multiplied by their weights)
+$ squeue (sorted by priority)
+  JOBID           NAME   ACCOUNT     QOS PARTIT    STATE   PRIORITY REASON
+     10        blocker  research  normal  batch  RUNNING      34333 None
+$ sacct (sorted by start time)
+JobID|JobName|Account|QOS|Partition|Submit|Start|End|Elapsed|State
+11|tea-C|teaching|normal|batch|2026-11-25T10:47:54|2026-11-25T10:47:54|2026-11-25T10:48:14|00:00:20|COMPLETED
+13|res-high|research|high|batch|2026-11-25T10:47:58|2026-11-25T10:48:14|2026-11-25T10:48:34|00:00:20|COMPLETED
+12|tea-D|teaching|normal|batch|2026-11-25T10:47:56|2026-11-25T10:48:34|2026-11-25T10:48:55|00:00:21|COMPLETED

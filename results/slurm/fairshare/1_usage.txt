@@ -1,0 +1,10 @@
+# After research used 3 x 60 s on 16 CPUs; teaching used nothing
+$ sshare -a -l
+Account               RawShares  NormShares    RawUsage  EffectvUsage  FairShare    LevelFS 
+-------------------- ---------- ----------- ----------- ------------- ---------- ---------- 
+root                               0.000000        2815      1.000000                       
+ root                         1    0.009901           0      0.000000   1.000000        inf 
+ research                    70    0.693069        2815      1.000000              0.693069 
+  research                    1    1.000000        2815      1.000000   0.333333   1.000000 
+ teaching                    30    0.297030           0      0.000000                   inf 
+  teaching                    1    1.000000           0      0.000000   1.000000        inf 

@@ -27,3 +27,6 @@ Thumbs.db
 .chart-lint/
 logs/
 .venv-mcp/
+
+# Apptainer images are build outputs
+*.sif

@@ -1,0 +1,9 @@
+start 2026-11-25T10:55:50+01:00
+$ apptainer pull vllm-0.32.0.sif docker://vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
+INFO:    Converting OCI blobs to SIF format
+INFO:    Starting build...
+INFO:    Fetching OCI image...
+FATAL:   While making image from oci registry: error fetching image to cache: while building SIF from layers: conveyor failed to get: error writing layer: read tcp [address redacted]->[address redacted]: read: network is unreachable
+exit=255
+end 2026-11-25T11:18:51+01:00
+ls: cannot access '~/apptainer-images/vllm-0.32.0.sif': No such file or directory

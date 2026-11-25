@@ -1,0 +1,33 @@
+# Recorded 2026-11-25
+apptainer 1.5.5
+make 4.3-4.1build2
+mariadb-server 1:10.11.14-0ubuntu0.24.04.1
+munge 0.5.15-4ubuntu0.1
+slurm-client 23.11.4-1.2ubuntu5
+slurm-wlm 23.11.4-1.2ubuntu5
+slurm-wlm-basic-plugins 23.11.4-1.2ubuntu5
+slurm-wlm-mysql-plugin 23.11.4-1.2ubuntu5
+slurmctld 23.11.4-1.2ubuntu5
+slurmd 23.11.4-1.2ubuntu5
+slurmdbd 23.11.4-1.2ubuntu5
+slurm-wlm 23.11.4
+apptainer version 1.5.5
+6.18.33.2-microsoft-standard-WSL2
+Python 3.12.12
+
+$ sinfo
+PARTITION AVAIL TIMELIMIT NODES STATE GRES
+batch* up 2:00:00 1 idle gpu:1
+short up 10:00 1 idle gpu:1
+
+$ sacctmgr show assoc (account, fairshare, qos)
+research|1|high,normal
+research|70|normal
+root|1|normal
+teaching|1|high,normal
+teaching|30|normal
+
+$ sacctmgr show qos
+Name|Priority
+normal|0
+high|100

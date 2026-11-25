@@ -1,0 +1,5 @@
+# k3s pod holding the GPU while the Slurm jobs ran
+NAME                    READY   STATUS    RESTARTS   AGE
+vllm-6b7c7cc9dc-zlmll   1/1     Running   0          34m
+memory.used [MiB], memory.total [MiB]
+13308 MiB, 16303 MiB

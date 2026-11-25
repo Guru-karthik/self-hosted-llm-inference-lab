@@ -1,0 +1,40 @@
+$ apptainer exec --nv bench-client.sif nvidia-smi -L
+Failed to initialize NVML: GPU access blocked by the operating system
+Failed to properly shut down NVML: GPU access blocked by the operating system
+
+exit=255
+
+$ apptainer exec --nv bench-client.sif sh -c ls -l /dev/dxg /dev/nvidia* ; ls /.singularity.d/libs | head -20
+ls: cannot access '/dev/nvidia*': No such file or directory
+crw-rw-rw- 1 nobody nogroup 10, 258 Nov 25 10:20 /dev/dxg
+libEGL.so.1
+libGL.so.1
+libGLX.so.0
+libGLdispatch.so.0
+libOpenCL.so.1
+libcuda.so.1
+libcudadebugger.so.1
+libnvcuvid.so.1
+libnvidia-encode.so.1
+libnvidia-gpucomp.so.610.57.01
+libnvidia-ml.so.1
+libnvidia-opticalflow.so.1
+exit=0
+
+$ apptainer exec --nv bench-client.sif /usr/lib/wsl/lib/nvidia-smi -L
+FATAL:   stat /usr/lib/wsl/lib/nvidia-smi: no such file or directory
+exit=255
+
+$ apptainer exec --bind /usr/lib/wsl bench-client.sif /usr/lib/wsl/lib/nvidia-smi -L
+NVIDIA-SMI couldn't find libnvidia-ml.so library in your system. Please make sure that the NVIDIA Display Driver is properly installed and present in your system.
+Please also try adding directory that contains libnvidia-ml.so to your system PATH.
+exit=12
+
+$ apptainer exec --bind /usr/lib/wsl --env LD_LIBRARY_PATH=/usr/lib/wsl/lib bench-client.sif /usr/lib/wsl/lib/nvidia-smi -L
+GPU 0: NVIDIA GeForce RTX 5070 Ti (UUID: GPU-42aca3b8-82c8-2ec8-9b3a-8e8125b9e1cd)
+exit=0
+
+/usr/bin/nvidia-container-cli
+$ apptainer exec --nv --bind /usr/lib/wsl --env LD_LIBRARY_PATH=/usr/lib/wsl/lib bench-client.sif /usr/lib/wsl/lib/nvidia-smi -L
+GPU 0: NVIDIA GeForce RTX 5070 Ti (UUID: GPU-42aca3b8-82c8-2ec8-9b3a-8e8125b9e1cd)
+exit=0

@@ -1,0 +1,5 @@
+$ squeue while the first GPU job runs
+  JOBID         NAME    STATE  TRES_PER_NODE REASON
+     23      no-gres  PENDING            N/A Priority
+     22   gpu-single  PENDING     gres/gpu:1 Resources
+     21   gpu-single  RUNNING     gres/gpu:1 None

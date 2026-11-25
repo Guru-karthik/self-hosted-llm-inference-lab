@@ -1,0 +1,25 @@
+# same account: batch job submitted before a short-partition job
+submission order: 15 16
+$ sshare -a -l
+Account               RawShares  NormShares    RawUsage  EffectvUsage  FairShare    LevelFS 
+-------------------- ---------- ----------- ----------- ------------- ---------- ---------- 
+root                               0.000000        7005      1.000000                       
+ root                         1    0.009901           0      0.000000   1.000000        inf 
+ research                    70    0.693069        5709      0.815040              0.850350 
+  research                    1    1.000000        5709      1.000000   0.333333   1.000000 
+ teaching                    30    0.297030        1295      0.184960              1.605915 
+  teaching                    1    1.000000        1295      1.000000   0.666667   1.000000 
+$ sprio -l
+  JOBID PARTITION   PRIORITY  FAIRSHARE      AGE      QOS  PARTITION
+     15     batch      34333      33333        0        0       1000
+     16     short      43333      33333        0        0      10000
+(factor columns are already multiplied by their weights)
+$ squeue (sorted by priority)
+  JOBID           NAME   ACCOUNT     QOS PARTIT    STATE   PRIORITY REASON
+     16      res-short  research  normal  short  PENDING      43333 Resources
+     15      res-batch  research  normal  batch  PENDING      34333 Nodes required for job are DOWN, DRAINED or reserved for jobs in higher priority partitions
+     14        blocker  research  normal  batch  RUNNING      34333 None
+$ sacct (sorted by start time)
+JobID|JobName|Account|QOS|Partition|Submit|Start|End|Elapsed|State
+16|res-short|research|normal|short|2026-11-25T10:49:10|2026-11-25T10:50:21|2026-11-25T10:50:40|00:00:19|COMPLETED
+15|res-batch|research|normal|batch|2026-11-25T10:49:08|2026-11-25T10:50:40|2026-11-25T10:51:01|00:00:21|COMPLETED

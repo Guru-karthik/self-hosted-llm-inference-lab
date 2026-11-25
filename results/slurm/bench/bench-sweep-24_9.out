@@ -1,0 +1,3 @@
+task=9 concurrency=2 repeat=3 url=http://10.43.16.123:8000/v1
+JSON: results/slurm/bench/c2_r3/vllm_20261125T095533.257453Z.json
+CSV:  results/slurm/bench/c2_r3/vllm_20261125T095533.257453Z.csv

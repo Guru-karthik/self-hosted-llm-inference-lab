@@ -179,3 +179,36 @@ Times are local to the WSL2 environment (`2026-10-29`, Europe/London).
 - vLLM tool flags verified via `vllm serve --help=all` (`--enable-auto-tool-choice`, `--tool-call-parser hermes` is a built-in choice) and added to `k8s/vllm/20-deployment.yaml`; pod restarted.
 - Run: port-forwards to vLLM and Prometheus, benchmark load at concurrency 8 in the background, then the agent. 7 tool calls logged (5 model-level calls; queue state issues 3 queries). p95 e2e 0.492 s, p95 TTFT 0.049 s, error rate 0, scrape up = 1, queue 0/0. Model answered "healthy". Its interpretation was weak (see README). Queue gauges reading 0 during load not investigated.
 - Artifacts: `results/mcp/agent_transcript_20261029.txt`, `results/mcp/tool_calls_20261029.jsonl`.
+
+## 2026-11-25 — Phase H: single-node Slurm sandbox
+
+Sandbox only, on the same WSL2 machine as k3s (Europe/Berlin offset +01:00 in the outputs). Not an HPC cluster.
+
+### Versions
+- Ubuntu archive: slurm-wlm/slurmctld/slurmd/slurmdbd 23.11.4-1.2ubuntu5, munge 0.5.15-4ubuntu0.1, mariadb-server 1:10.11.14-0ubuntu0.24.04.1, make 4.3-4.1build2.
+- Apptainer 1.5.5 from the upstream release `.deb` (sha256 `25095d37...dce77`, checked by the script). Full list: `results/slurm/versions.txt`.
+
+### Commands
+- `./scripts/setup-slurm-wsl.sh` (run by the user, with sudo; run twice).
+- `./slurm/demo-fairshare.sh`, then `./slurm/demo-fairshare.sh 3_qos`; `./slurm/demo-gpu.sh`; `sbatch slurm/jobs/bench-array.sbatch` (job 24); `slurm/apptainer/run-apptainer-test.sh <sif>`.
+
+### Problems and fixes
+- `slurmdbd` + MariaDB were added to the original scope: `sacct`, accounts, fair-share and QoS need accounting storage.
+- Ubuntu's Slurm packages contain no `gpu_nvml.so`, so NVML autodetect cannot work. WSL2 also has no `/dev/nvidia*`.
+- First install used a count-only GPU. slurmd logged `Ignoring file-less GPU` and the node was drained (`results/slurm/gres/count_only_drain.txt`). Fix: `File=/dev/dxg` plus `scontrol update ... State=RESUME`. Probes of all three declarations are in `results/slurm/gres/`.
+- Probing GPU declarations without root failed (slurmd needs cgroup access, and 23.11 has no `CgroupPlugin=disabled`); the probes were moved into the setup script.
+- cgroup v2 worked for the root `slurmd` under WSL2; no fallback was needed. At start it also logged that the PMIx MPI plugins could not load; MPI is out of scope and this was left.
+- The hostname resolves to a link-local IPv6 address; `NodeAddr=127.0.0.1` pins loopback.
+- QoS stage, first run: `tea-C` started before the blocker did, leaving an empty snapshot. The script now waits for the blocker to be RUNNING. The invalid output is kept.
+- `make` was installed by the setup script (earlier phases could not run it).
+
+### Apptainer (time-box 45 min from 10:41; the user later lifted it for vLLM)
+- Client `.sif` (45 MB) built unprivileged from `python:3.12.12-slim` pinned by digest.
+- `--nv` alone: NVML "GPU access blocked by the operating system". `--bind /usr/lib/wsl` + `LD_LIBRARY_PATH`: `nvidia-smi` works, and `cuInit`, context creation and a 1 MiB `cuMemAlloc` return 0.
+- The client run happened while the fair-share demo's `sleep` jobs were running.
+- `--nv` together with the same bind also works for `nvidia-smi`.
+- vLLM image (`vllm/vllm-openai@sha256:befccf0e...`, 9.2 GB compressed per the registry manifest): `apptainer pull` failed twice with `read tcp ... read: network is unreachable` (10:55:50 to 11:18:51 and 11:19:00 to 11:51:52). Addresses were redacted from the saved logs. Not diagnosed; stopped after the retry. The k3s Deployment was never scaled down and `slurm/apptainer/run-vllm.sh` has not been run.
+### Left on the machine
+- Slurm, munge and MariaDB services are enabled at boot (disable command in the setup script header).
+- `~/apptainer-images/hf` (5.2 GB copy of the model weights from the PVC) and `~/.apptainer/cache` (2.6 GB of partial layers). Not deleted.
+- Checks: `make test lint PY=.venv-mcp/bin/python`: 7 + 7 tests passed, yamllint clean.

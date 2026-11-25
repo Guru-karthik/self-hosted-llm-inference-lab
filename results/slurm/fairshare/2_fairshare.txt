@@ -1,0 +1,31 @@
+# research submits first, teaching second: who starts first?
+submission order: 6 7 8 9
+$ sshare -a -l
+Account               RawShares  NormShares    RawUsage  EffectvUsage  FairShare    LevelFS 
+-------------------- ---------- ----------- ----------- ------------- ---------- ---------- 
+root                               0.000000        3231      1.000000                       
+ root                         1    0.009901           0      0.000000   1.000000        inf 
+ research                    70    0.693069        3231      1.000000              0.693069 
+  research                    1    1.000000        3231      1.000000   0.333333   1.000000 
+ teaching                    30    0.297030           0      0.000000                   inf 
+  teaching                    1    1.000000           0      0.000000   1.000000        inf 
+$ sprio -l
+  JOBID PARTITION   PRIORITY  FAIRSHARE      AGE      QOS  PARTITION
+      6     batch      34333      33333        0        0       1000
+      7     batch      34333      33333        0        0       1000
+      8     batch     101000     100000        0        0       1000
+      9     batch     101000     100000        0        0       1000
+(factor columns are already multiplied by their weights)
+$ squeue (sorted by priority)
+  JOBID           NAME   ACCOUNT     QOS PARTIT    STATE   PRIORITY REASON
+      9          tea-B  teaching  normal  batch  PENDING     101000 Priority
+      8          tea-A  teaching  normal  batch  PENDING     101000 Resources
+      7          res-B  research  normal  batch  PENDING      34333 Priority
+      6          res-A  research  normal  batch  PENDING      34333 Priority
+      5        blocker  research  normal  batch  RUNNING      34333 None
+$ sacct (sorted by start time)
+JobID|JobName|Account|QOS|Partition|Submit|Start|End|Elapsed|State
+8|tea-A|teaching|normal|batch|2026-11-25T10:45:20|2026-11-25T10:46:33|2026-11-25T10:46:53|00:00:20|COMPLETED
+9|tea-B|teaching|normal|batch|2026-11-25T10:45:22|2026-11-25T10:46:53|2026-11-25T10:47:13|00:00:20|COMPLETED
+6|res-A|research|normal|batch|2026-11-25T10:45:16|2026-11-25T10:47:13|2026-11-25T10:47:33|00:00:20|COMPLETED
+7|res-B|research|normal|batch|2026-11-25T10:45:18|2026-11-25T10:47:33|2026-11-25T10:47:54|00:00:21|COMPLETED
