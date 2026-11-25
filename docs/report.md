@@ -143,6 +143,10 @@ Twelve faults were injected, one run each, with the diagnoses expected from the 
 
 Read-only, fixed-query tools limited what an injected instruction could do to the wording of an answer. They did not stop it changing the wording, so the answer has to be treated as untrusted input by whoever or whatever reads it.
 
+### 4.7 Getting model files in
+
+A Kubernetes Job checks every file against a manifest of the publisher's sizes and digests, enforces a size limit, allows only safetensors weights and publishes nothing unless all checks pass. The real model (11 files, 5,582,398,839 bytes) passed, and vLLM then served from the verified volume. Runs with a wrong digest in the manifest, a lower size limit and a `.bin` entry were refused ([`results/model-fetch/`](../results/model-fetch/)). The source was a `file://` copy of an existing volume: **no download inside the cluster was tested**, and digests show which files these are, not that the model can be trusted ([model requests](model-requests.md)).
+
 ## 5. Threats to validity
 
 **Measurement.**

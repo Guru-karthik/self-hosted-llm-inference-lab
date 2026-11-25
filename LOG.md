@@ -292,6 +292,10 @@ Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
 - Problem caught before running: the first draft of `run-checks.sh` deleted the Job and ConfigMap with one wrong `kubectl delete` command and rewrote the Job by text replacement; both were changed.
 - Left on the machine: PVC `model-store` (about 5.2 GiB used). `llm-inference` is now at its limit of 2 volume claims.
 
+## 2026-11-25 — Documentation pass
+- Updated README intro, repo map, architecture diagram (not rendered locally), environment table and platform-mapping wording; added report section 4.7 on the model fetch.
+- The README's repeated-run command had a truncated image digest and wrote into the committed results folder, which would have broken the table generator; both fixed.
+
 ## 2026-11-25 — Phase D (optional): design note, no code
 - `docs/federation-and-tenant-observability.md`, marked design, not implemented. Nothing in it was run.
 - Licences read with `gh api repos/<owner>/<repo>/license`; LiteLLM reports no single identifier (MIT outside its enterprise folder) and was left out of the note.
