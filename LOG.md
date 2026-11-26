@@ -304,4 +304,4 @@ Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
 ## 2026-11-26 — Phase E verdicts
 - The author graded the 12 fault runs in `results/mcp-eval/run1/`: 6 yes (01, 03, 04, 05, 08, 09), 5 partial (02, 07, 10, 11, 12), 1 no (06, unobservable). `python mcp/eval/score.py summary results/mcp-eval/run1` printed `n=12 yes=6 partial=5 no=1`.
 - One scorer, not blind. The injection runs (including I4) have no verdict filled in.
-- Later the same day the author changed 05 from yes to partial: the answer names increased load among possible causes, which the label rules out. The counts are now 5 yes, 6 partial, 1 no (`n=12 yes=5 partial=6 no=1`); this replaces the counts above.
+- Later the same day the author changed 05 from yes to partial, after Claude Code pointed out that the answer names increased load among possible causes, which the label rules out. The counts are now 5 yes, 6 partial, 1 no (`n=12 yes=5 partial=6 no=1`); this replaces the counts above.
