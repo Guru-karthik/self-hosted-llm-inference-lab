@@ -247,7 +247,7 @@ What this does and does not show:
 | 02 healthy, light load | up; p95 latency 0.644 s | partial |
 | 03 overload (32 clients) | up; 8 running, 24 waiting; p95 latency 18.964 s | yes |
 | 04 KV-cache pressure | up; 4 running, 4 waiting; KV usage 0.818 | yes |
-| 05 very long outputs | up; p95 latency 17.75 s, p95 TTFT 0.175 s, no queue | yes |
+| 05 very long outputs | up; p95 latency 17.75 s, p95 TTFT 0.175 s, no queue | partial |
 | 06 client disconnects | nothing visible (see below) | no; **unobservable** |
 | 07 scaled to zero | no vLLM series | partial |
 | 08 pod restarting | scrape down | yes |
@@ -256,7 +256,7 @@ What this does and does not show:
 | 11 wrong scrape path | scrape down (service running) | partial |
 | 12 NetworkPolicy blocks Prometheus | scrape down (service running) | partial |
 
-**Totals: 6 yes, 5 partial, 1 no** (12 faults, one run each). The one "no" is fault 06, which no tool could see; of the other 11, 6 were yes and 5 partial. I graded the answers myself on 2026-11-26 against the written labels, not blind to the fault; no LLM judge was used. The answers are in [`review.md`](results/mcp-eval/run1/review.md) and the verdicts in [`scores.csv`](results/mcp-eval/run1/scores.csv).
+**Totals: 5 yes, 6 partial, 1 no** (12 faults, one run each). The one "no" is fault 06, which no tool could see; of the other 11, 5 were yes and 6 partial. I graded the answers myself on 2026-11-26 against the written labels, not blind to the fault; no LLM judge was used. The answers are in [`review.md`](results/mcp-eval/run1/review.md) and the verdicts in [`scores.csv`](results/mcp-eval/run1/scores.csv).
 
 Facts that do not depend on judgement:
 

@@ -134,7 +134,7 @@ Apptainer ran the benchmark client from a `.sif` once the WSL driver folder was 
 
 ### 4.6 A model as operations assistant
 
-Twelve faults were injected, one run each, with the diagnoses expected from the agent written in advance ([`mcp/eval/faults.yaml`](../mcp/eval/faults.yaml); runs in [`results/mcp-eval/`](../results/mcp-eval/)). The author graded each answer against its label: **6 yes, 5 partial, 1 no**. The "no" was the fault that no tool could see; of the other 11, 6 were yes and 5 partial. This is one run per fault and one non-blind scorer, so it is not an accuracy estimate ([`scores.csv`](../results/mcp-eval/run1/scores.csv)). What can be stated without judgement:
+Twelve faults were injected, one run each, with the diagnoses expected from the agent written in advance ([`mcp/eval/faults.yaml`](../mcp/eval/faults.yaml); runs in [`results/mcp-eval/`](../results/mcp-eval/)). The author graded each answer against its label: **5 yes, 6 partial, 1 no**. The "no" was the fault that no tool could see; of the other 11, 5 were yes and 6 partial. This is one run per fault and one non-blind scorer, so it is not an accuracy estimate ([`scores.csv`](../results/mcp-eval/run1/scores.csv)). What can be stated without judgement:
 
 - In all 17 runs (12 faults and 5 prompt-injection runs) the agent called the same five tools in the same order and never a GPU tool, so it could not have noticed that GPU metrics were missing.
 - vLLM 0.32.0 did not count client disconnects in its finished-request counter, so one fault was invisible to every tool ([`abort_check.txt`](../results/mcp-eval/smoke/abort_check.txt)).
