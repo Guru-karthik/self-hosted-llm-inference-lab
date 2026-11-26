@@ -134,7 +134,7 @@ Apptainer ran the benchmark client from a `.sif` once the WSL driver folder was 
 
 ### 4.6 A model as operations assistant
 
-Twelve faults were injected, one run each, with the diagnoses expected from the agent written in advance ([`mcp/eval/faults.yaml`](../mcp/eval/faults.yaml); runs in [`results/mcp-eval/`](../results/mcp-eval/)). **The answers have not yet been scored by a person, so no accuracy is reported.** What can be stated without judgement:
+Twelve faults were injected, one run each, with the diagnoses expected from the agent written in advance ([`mcp/eval/faults.yaml`](../mcp/eval/faults.yaml); runs in [`results/mcp-eval/`](../results/mcp-eval/)). The author graded each answer against its label: **6 yes, 5 partial, 1 no**. The "no" was the fault that no tool could see; of the other 11, 6 were yes and 5 partial. This is one run per fault and one non-blind scorer, so it is not an accuracy estimate ([`scores.csv`](../results/mcp-eval/run1/scores.csv)). What can be stated without judgement:
 
 - In all 17 runs (12 faults and 5 prompt-injection runs) the agent called the same five tools in the same order and never a GPU tool, so it could not have noticed that GPU metrics were missing.
 - vLLM 0.32.0 did not count client disconnects in its finished-request counter, so one fault was invisible to every tool ([`abort_check.txt`](../results/mcp-eval/smoke/abort_check.txt)).
@@ -165,7 +165,7 @@ A Kubernetes Job checks every file against a manifest of the publisher's sizes a
 
 **Isolation.** The tests show that particular requests were blocked or rejected, not that no other path exists. No container escape, driver attack or resource exhaustion was attempted.
 
-**Agent evaluation.** One run per fault, one 7B 4-bit model, one question that presumes slowness, labels drafted by an AI assistant and accepted by the author, and no human scores yet. A proper study would need repeated runs, several models and neutral questions, faults and labels from people who operate such systems, two blind scorers with measured agreement, and a comparison with plain alert rules.
+**Agent evaluation.** One run per fault, one 7B 4-bit model, one question that presumes slowness, labels drafted by an AI assistant and accepted by the author, and one non-blind human scorer (the author). A proper study would need repeated runs, several models and neutral questions, faults and labels from people who operate such systems, two blind scorers with measured agreement, and a comparison with plain alert rules.
 
 **Process.** The lab was built with an AI coding assistant. Among the mistakes found and fixed in its test harness were three that could have produced false results (an egress check that could not fail, a race in the fair-share demo, and a load generator that cut off every request). This is a reason to treat any unreviewed check with care; all three are recorded in `LOG.md`.
 
@@ -179,7 +179,7 @@ A Kubernetes Job checks every file against a manifest of the publisher's sizes a
 | Time-slicing slowdown and lack of memory isolation | MIG or vGPU (not available on this consumer GPU) |
 | Two-tenant network, API and quota checks | Authentication, API gateway, TLS, tenant identity from an identity provider |
 | Slurm priority mechanics on one node | Multi-node jobs, MPI, parallel filesystem, scheduler at scale |
-| Agent tool use on injected faults (unscored) | Agent accuracy; alerting; per-tenant observability |
+| Agent tool use on injected faults; one scorer's verdicts on 12 single runs | Agent accuracy; alerting; per-tenant observability |
 | | Federation across sites |
 
 ## 7. Reference architecture sketch

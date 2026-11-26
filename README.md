@@ -243,20 +243,20 @@ What this does and does not show:
 
 | Fault ([raw](results/mcp-eval/run1/)) | What Prometheus showed when the agent started | Verdict |
 |---|---|---|
-| 01 healthy, idle | up; nothing running or waiting | not yet reviewed |
-| 02 healthy, light load | up; p95 latency 0.644 s | not yet reviewed |
-| 03 overload (32 clients) | up; 8 running, 24 waiting; p95 latency 18.964 s | not yet reviewed |
-| 04 KV-cache pressure | up; 4 running, 4 waiting; KV usage 0.818 | not yet reviewed |
-| 05 very long outputs | up; p95 latency 17.75 s, p95 TTFT 0.175 s, no queue | not yet reviewed |
-| 06 client disconnects | nothing visible (see below) | not yet reviewed; **unobservable** |
-| 07 scaled to zero | no vLLM series | not yet reviewed |
-| 08 pod restarting | scrape down | not yet reviewed |
-| 09 crash loop | scrape down | not yet reviewed |
-| 10 DCGM exporter stopped | up; GPU metrics missing | not yet reviewed |
-| 11 wrong scrape path | scrape down (service running) | not yet reviewed |
-| 12 NetworkPolicy blocks Prometheus | scrape down (service running) | not yet reviewed |
+| 01 healthy, idle | up; nothing running or waiting | yes |
+| 02 healthy, light load | up; p95 latency 0.644 s | partial |
+| 03 overload (32 clients) | up; 8 running, 24 waiting; p95 latency 18.964 s | yes |
+| 04 KV-cache pressure | up; 4 running, 4 waiting; KV usage 0.818 | yes |
+| 05 very long outputs | up; p95 latency 17.75 s, p95 TTFT 0.175 s, no queue | yes |
+| 06 client disconnects | nothing visible (see below) | no; **unobservable** |
+| 07 scaled to zero | no vLLM series | partial |
+| 08 pod restarting | scrape down | yes |
+| 09 crash loop | scrape down | yes |
+| 10 DCGM exporter stopped | up; GPU metrics missing | partial |
+| 11 wrong scrape path | scrape down (service running) | partial |
+| 12 NetworkPolicy blocks Prometheus | scrape down (service running) | partial |
 
-**Totals: not yet reviewed.** The agent's answers are in [`review.md`](results/mcp-eval/run1/review.md) next to the labels; no verdict has been filled in, and no LLM judge was used.
+**Totals: 6 yes, 5 partial, 1 no** (12 faults, one run each). The one "no" is fault 06, which no tool could see; of the other 11, 6 were yes and 5 partial. I graded the answers myself on 2026-11-26 against the written labels, not blind to the fault; no LLM judge was used. The answers are in [`review.md`](results/mcp-eval/run1/review.md) and the verdicts in [`scores.csv`](results/mcp-eval/run1/scores.csv).
 
 Facts that do not depend on judgement:
 

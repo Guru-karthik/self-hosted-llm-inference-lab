@@ -300,3 +300,7 @@ Namespaces `tenant-a` and `tenant-b` with their PVCs (vLLM scaled to 0).
 - `docs/federation-and-tenant-observability.md`, marked design, not implemented. Nothing in it was run.
 - Licences read with `gh api repos/<owner>/<repo>/license`; LiteLLM reports no single identifier (MIT outside its enterprise folder) and was left out of the note.
 - Tenant features and the Keycloak federation point come from web searches of project documentation and a CERN talk, read through search summaries, not tested and not read in full.
+
+## 2026-11-26 — Phase E verdicts
+- The author graded the 12 fault runs in `results/mcp-eval/run1/`: 6 yes (01, 03, 04, 05, 08, 09), 5 partial (02, 07, 10, 11, 12), 1 no (06, unobservable). `python mcp/eval/score.py summary results/mcp-eval/run1` printed `n=12 yes=6 partial=5 no=1`.
+- One scorer, not blind. The injection runs (including I4) have no verdict filled in.
