@@ -2,7 +2,7 @@
      from results/ by scripts/render-results.py and checked in CI; do not edit them by hand. -->
 # Serving a 7B model on one GPU: measurements, isolation and operations
 
-*Technical report on a single-machine lab, 2026-10-29 and 2026-11-25. Every number comes from a file in [`results/`](../results/) or from [`LOG.md`](../LOG.md).*
+*Technical report on a single-machine lab, 2026-10-29 and 2026-11-25; agent answers graded 2026-11-26. Every number comes from a file in [`results/`](../results/) or from [`LOG.md`](../LOG.md).*
 
 ## 1. Question
 

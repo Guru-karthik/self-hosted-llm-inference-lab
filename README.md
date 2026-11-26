@@ -72,6 +72,7 @@ flowchart LR
   PLUG -.->|"time-sliced units"| T
   MS -->|"fixed PromQL"| PR
   AG -->|"chat and tools"| SVC
+  AG -.->|"during evaluation: second vLLM"| T
   EV -->|"breaks, then restores"| V2
   EV --> AG
 ```
