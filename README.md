@@ -1,6 +1,6 @@
 # Self-hosted LLM inference lab
 
-A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Later work added a two-tenant isolation test, a single-node Slurm sandbox, repeated benchmark runs, a verified model-fetch Job and a small fault-injection evaluation of a read-only operations agent. Everything here was run on one machine, on 2026-10-29 except the [repeated benchmark runs](#repeated-runs-and-ollama-with-parallelism-tuned), [AI-operations evaluation](#ai-operations-evaluation), [two-tenant isolation](#two-tenants-on-one-gpu) and [Slurm sandbox](#slurm-sandbox) work (2026-11-25); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
+A small, measured study of serving an open-weight LLM on a single consumer GPU: Ollama vs vLLM in Docker, then vLLM on a local Kubernetes (k3s) cluster with Prometheus and Grafana (including GPU metrics). Later work added a two-tenant isolation test, a single-node Slurm sandbox, repeated benchmark runs, a verified model-fetch Job and a small fault-injection evaluation of a read-only operations agent. Everything here was run on one machine, on 2026-10-29 except the [repeated benchmark runs](#repeated-runs-and-ollama-with-parallelism-tuned), [AI-operations evaluation](#ai-operations-evaluation), [two-tenant isolation](#two-tenants-on-one-gpu), [Slurm sandbox](#slurm-sandbox) and [model-fetch](#verified-model-fetch) work (2026-11-25) and the grading of the agent's answers (2026-11-26); every number in this README comes from the result files in [`results/`](results/) or from [`LOG.md`](LOG.md), which records commands, versions and problems as they happened.
 
 This is a learning/portfolio project for AI-infrastructure platform engineering. It is **not** a production platform, and the [limitations](#limitations) and [what I did not do](#what-i-did-not-do) sections are part of the result.
 
@@ -284,7 +284,7 @@ Mapping to the OWASP Top 10 for LLM applications (2025):
 
 #### What this does NOT show
 
-Not a reliability measurement. One run per fault (I3 twice), a single 7B 4-bit model, temperature 0, one question that asks "why might it be slow?" even when nothing is wrong, labels drafted by an AI assistant and accepted by me, and one person to score. The faults are simple and injected one at a time. The GPU metrics include the agent's own model. A proper study would need many repeats per fault with varied load, several models and prompts (including a neutral question), faults and labels written by people who run such systems, at least two blind scorers with measured agreement, a baseline such as plain alert rules, and injection payloads through every channel a real deployment would have.
+Not a reliability measurement. One run per fault (I3 twice), a single 7B 4-bit model, temperature 0, one question that asks "why might it be slow?" even when nothing is wrong, labels drafted by an AI assistant and accepted by me, and one scorer (me), not blind to the fault. The faults are simple and injected one at a time. The GPU metrics include the agent's own model. A proper study would need many repeats per fault with varied load, several models and prompts (including a neutral question), faults and labels written by people who run such systems, at least two blind scorers with measured agreement, a baseline such as plain alert rules, and injection payloads through every channel a real deployment would have.
 
 ### Monitoring
 
@@ -475,12 +475,16 @@ Note: the Makefile targets were written from the commands I ran by hand. `make t
 
 ## Limitations
 
-- Single machine, single GPU, single node; one run per configuration except the repeated benchmark runs (five runs, one session); small prompt set; short outputs.
+- Single machine, single GPU, single node; one run per configuration except the repeated benchmark runs (five runs, one session) and the k3s start-up timing (three runs); small prompt set; short outputs.
+- The confidence intervals cover run-to-run noise within one session only; differences between days were larger ([report](docs/report.md#5-threats-to-validity)).
 - WSL2 networking and GPU virtualisation may differ from a bare-metal Linux cluster, so absolute numbers may not transfer.
 - Benchmark client and server share the same machine (CPU contention possible).
 - Output quality was not evaluated, only speed.
 - Peak VRAM is whole-GPU memory sampled with `nvidia-smi`, including other processes.
 - Host-level metrics (node-exporter) are disabled; its image would not pull.
+- The isolation tests show particular requests being blocked or rejected. No container escape, driver attack or resource exhaustion was attempted.
+- The agent's answers were graded by one person (me), not blind, against labels drafted by an AI assistant; the counts are not an accuracy estimate.
+- The lab was built with an AI coding assistant. Mistakes found in its test harness, some of which could have produced false results, are recorded in [`LOG.md`](LOG.md); there has been no independent review.
 
 ## What I did not do
 
